@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Everyworks — Inventory Receiving</title>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<style>
+  :root { --blue:#1a73e8; --green:#188038; --red:#d93025; --grey:#5f6368; --bg:#f6f8fa; }
+  * { box-sizing:border-box; margin:0; padding:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; }
+  body { background:var(--bg); color:#202124; padding-bottom:40px; }
+  header { background:var(--blue); color:#fff; padding:14px 16px; font-size:17px; font-weight:600; position:sticky; top:0; z-index:10; }
+  .step { max-width:560px; margin:0 auto; padding:16px; }
+  .card { background:#fff; border:1px solid #dadce0; border-radius:10px; padding:14px; margin-bottom:12px; }
+  h2 { font-size:15px; color:var(--grey); margin-bottom:10px; text-transform:uppercase; letter-spacing:.4px; }
+  label { display:block; font-size:13px; color:var(--grey); margin:8px 0 4px; }
+  input[type=text], input[type=number], select {
+    width:100%; padding:11px 12px; font-size:16px; border:1px solid #dadce0; border-radius:8px; background:#fff;
+  }
+  input:focus, select:focus { outline:2px solid var(--blue); border-color:var(--blue); }
+  button { width:100%; padding:13px; font-size:16px; font-weight:600; border:none; border-radius:8px; cursor:pointer; margin-top:10px; }
+  .btn-primary { background:var(--blue); color:#fff; }
+  .btn-secondary { background:#e8f0fe; color:var(--blue); }
+  .btn-green { background:var(--green); color:#fff; }
+  .btn-small { width:auto; padding:8px 14px; font-size:14px; margin:0; }
+  button:disabled { opacity:.45; cursor:default; }
+  .line { display:flex; align-items:flex-start; gap:10px; padding:12px 0; border-bottom:1px solid #f0f0f0; }
+  .line:last-child { border-bottom:none; }
+  .line input[type=checkbox] { width:22px; height:22px; margin-top:3px; flex-shrink:0; }
+  .line-info { flex:1; min-width:0; }
+  .line-name { font-weight:600; font-size:15px; }
+  .line-meta { font-size:13px; color:var(--grey); margin-top:2px; }
+  .badge { display:inline-block; font-size:11px; font-weight:700; padding:2px 7px; border-radius:10px; background:#fce8e6; color:var(--red); margin-left:6px; vertical-align:1px; }
+  .qty-box { flex-shrink:0; display:flex; align-items:center; gap:4px; }
+  .qty-box input { text-align:center; padding:9px 2px; width:46px; }
+  .qty-step { width:36px; height:40px; font-size:20px; font-weight:700; border:1px solid #dadce0; border-radius:8px; background:#f1f3f4; color:var(--blue); padding:0; margin:0; flex-shrink:0; }
+  .error { color:var(--red); font-size:14px; margin-top:8px; }
+  .muted { color:var(--grey); font-size:13px; }
+  #reader { width:100%; border-radius:8px; overflow:hidden; margin-top:8px; }
+  .serial-chip { display:inline-flex; align-items:center; gap:6px; background:#e6f4ea; color:var(--green); font-size:13px; font-weight:600; padding:5px 10px; border-radius:14px; margin:4px 4px 0 0; }
+  .serial-chip span { cursor:pointer; color:var(--red); font-weight:700; }
+  .progress { font-size:14px; font-weight:600; color:var(--blue); margin-bottom:6px; }
+  .result-icon { font-size:52px; text-align:center; margin:18px 0 6px; }
+  .result-title { text-align:center; font-size:19px; font-weight:700; margin-bottom:6px; }
+  .result-detail { text-align:center; font-size:14px; color:var(--grey); }
+  .spinner { border:3px solid #e8eaed; border-top:3px solid var(--blue); border-radius:50%; width:28px; height:28px; animation:spin .8s linear infinite; margin:14px auto; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  .hidden { display:none; }
+  .row { display:flex; gap:8px; }
+  .row > * { flex:1; }
+</style>
+</head>
+<body>
+<header>📦 Inventory Receiving</header>
+
+<!-- STEP 1: PO number -->
+<div class="step" id="step1">
+  <div class="card">
+    <h2>Purchase Order</h2>
+    <label>PO Number</label>
+    <input type="text" id="poInput" placeholder="e.g. PO-1005" autocomplete="off" autocapitalize="characters">
+    <button class="btn-primary" id="lookupBtn" onclick="lookupPO()">Look Up PO</button>
+    <div class="error hidden" id="lookupErr"></div>
+  </div>
+</div>
+
+<!-- STEP 2: lines review -->
+<div class="step hidden" id="step2">
+  <div class="card">
+    <h2>PO <span id="poLabel"></span> — tick lines received</h2>
+    <div id="linesBox"></div>
+  </div>
+  <div class="card">
+    <h2>Details</h2>
+    <label>Receive into location</label>
+    <select id="locationSel"></select>
+    <label>Your name / staff ID</label>
+    <input type="text" id="staffInput" placeholder="STAFF001" value="">
+  </div>
+  <button class="btn-primary" id="continueBtn" onclick="continueFromLines()">Continue</button>
+  <button class="btn-secondary" onclick="resetApp()">Start over</button>
+  <div class="error hidden" id="linesErr"></div>
+</div>
+
+<!-- STEP 3: serial scan -->
+<div class="step hidden" id="step3">
+  <div class="card">
+    <div class="progress" id="scanProgress"></div>
+    <div class="line-name" id="scanItemName"></div>
+    <div class="muted">Scan the Code-128 serial sticker on each unit, or type it manually.</div>
+    <div id="reader"></div>
+    <button class="btn-secondary" id="camBtn" onclick="toggleCamera()">📷 Start camera</button>
+    <div class="row" style="margin-top:10px;">
+      <input type="text" id="manualSerial" placeholder="Type serial number" autocomplete="off">
+      <button class="btn-secondary btn-small" style="flex:0 0 auto;" onclick="addManualSerial()">Add</button>
+    </div>
+    <div id="serialChips" style="margin-top:8px;"></div>
+    <div class="error hidden" id="scanErr"></div>
+  </div>
+  <button class="btn-primary" id="scanNextBtn" onclick="nextScanItem()" disabled>Next</button>
+  <button class="btn-secondary" onclick="backToLines()">Back</button>
+</div>
+
+<!-- STEP 4: confirm + submit -->
+<div class="step hidden" id="step4">
+  <div class="card">
+    <h2>Confirm receipt</h2>
+    <div id="confirmBox"></div>
+  </div>
+  <button class="btn-green" id="submitBtn" onclick="submitReceive()">✓ Confirm &amp; Receive</button>
+  <button class="btn-secondary" onclick="backToLines()">Back</button>
+  <div class="error hidden" id="submitErr"></div>
+</div>
+
+<!-- STEP 5: result -->
+<div class="step hidden" id="step5">
+  <div class="card">
+    <div class="result-icon" id="resultIcon">✅</div>
+    <div class="result-title" id="resultTitle"></div>
+    <div class="result-detail" id="resultDetail"></div>
+  </div>
+  <button class="btn-primary" onclick="resetApp()">Receive another PO</button>
+</div>
+
+<div class="step hidden" id="loading"><div class="card"><div class="spinner"></div><div class="muted" style="text-align:center;">Working…</div></div></div>
+
+<script>
+var N8N_BASE = 'https://n8n-jpnq.srv1784919.hstgr.cloud';
+var state = { poNumber:'', lines:[], locations:['Warehouse'], toReceive:[], scanQueue:[], scanIdx:0, scanner:null, cameraOn:false };
+
+function show(id){ ['step1','step2','step3','step4','step5','loading'].forEach(function(s){ document.getElementById(s).classList.toggle('hidden', s!==id); }); }
+function err(id,msg){ var e=document.getElementById(id); if(msg){ e.textContent=msg; e.classList.remove('hidden'); } else e.classList.add('hidden'); }
+
+async function api(path, body){
+  var r = await fetch(N8N_BASE + path, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
+  var t = await r.text();
+  var j; try { j = JSON.parse(t); } catch(e){ j = { ok:false, error:'Bad response: '+t.slice(0,120) }; }
+  if(!r.ok && j.ok===undefined) j.ok=false;
+  return j;
+}
+
+async function lookupPO(){
+  err('lookupErr','');
+  var po = document.getElementById('poInput').value.trim();
+  if(!po){ err('lookupErr','Enter a PO number.'); return; }
+  document.getElementById('lookupBtn').disabled = true;
+  setTimeout(function(){ document.getElementById('lookupBtn').disabled = false; }, 3000);
+  show('loading');
+  var res = await api('/webhook/api-po-lookup', { poNumber: po });
+  if(!res.ok || !res.lines || !res.lines.length){
+    show('step1');
+    err('lookupErr', res.error || ('No open lines found for PO "'+po+'". Check the number.'));
+    return;
+  }
+  state.poNumber = res.poNumber || po;
+  state.lines = res.lines;
+  state.locations = res.locations && res.locations.length ? res.locations : ['Warehouse'];
+  renderLines();
+  show('step2');
+}
+
+function renderLines(){
+  document.getElementById('poLabel').textContent = state.poNumber;
+  var box = document.getElementById('linesBox'); box.innerHTML='';
+  state.lines.forEach(function(l, i){
+    var outstanding = Math.max(0, (l.qtyOrdered||0) - (l.qtyReceived||0));
+    var div = document.createElement('div'); div.className='line';
+    div.innerHTML =
+      '<input type="checkbox" id="chk'+i+'" '+(outstanding>0?'checked':'')+'>' +
+      '<div class="line-info"><div class="line-name">'+escapeHtml(l.itemName||l.sku)+(l.highValue?'<span class="badge">SERIAL</span>':'')+'</div>' +
+      '<div class="line-meta">'+escapeHtml(l.sku)+' · ordered '+(l.qtyOrdered||0)+' · received '+(l.qtyReceived||0)+'</div></div>' +
+      '<div class="qty-box"><button type="button" class="qty-step" onclick="stepQty('+i+',-1)">−</button>' +
+      '<input type="number" id="qty'+i+'" min="0" value="'+outstanding+'" inputmode="numeric">' +
+      '<button type="button" class="qty-step" onclick="stepQty('+i+',1)">+</button></div>';
+    box.appendChild(div);
+  });
+  var sel = document.getElementById('locationSel'); sel.innerHTML='';
+  state.locations.forEach(function(loc){ var o=document.createElement('option'); o.value=loc; o.textContent=loc; sel.appendChild(o); });
+  sel.value = 'Warehouse';
+}
+
+function stepQty(i, delta){
+  var inp = document.getElementById('qty'+i);
+  var v = (parseInt(inp.value, 10) || 0) + delta;
+  inp.value = Math.max(0, Math.min(999, v));
+}
+
+function continueFromLines(){
+  err('linesErr','');
+  var toReceive = [];
+  state.lines.forEach(function(l, i){
+    var checked = document.getElementById('chk'+i).checked;
+    var qty = parseInt(document.getElementById('qty'+i).value, 10) || 0;
+    if(checked && qty>0) toReceive.push({ lineKey:l.lineKey, sku:l.sku, itemName:l.itemName, qty:qty, highValue:!!l.highValue, serials:[] });
+  });
+  if(!toReceive.length){ err('linesErr','Tick at least one line with a quantity above zero.'); return; }
+  state.toReceive = toReceive;
+  state.scanQueue = toReceive.filter(function(l){ return l.highValue; });
+  state.scanIdx = 0;
+  if(state.scanQueue.length){ startScanStep(); } else { renderConfirm(); show('step4'); }
+}
+
+function startScanStep(){
+  var item = state.scanQueue[state.scanIdx];
+  item.serials = item.serials || [];
+  document.getElementById('scanProgress').textContent = 'Item '+(state.scanIdx+1)+' of '+state.scanQueue.length;
+  document.getElementById('scanItemName').textContent = item.itemName+' — scan '+item.qty+' serial'+(item.qty>1?'s':'');
+  document.getElementById('manualSerial').value='';
+  err('scanErr','');
+  renderChips();
+  show('step3');
+}
+
+function renderChips(){
+  var item = state.scanQueue[state.scanIdx];
+  var box = document.getElementById('serialChips'); box.innerHTML='';
+  item.serials.forEach(function(s, i){
+    var c = document.createElement('div'); c.className='serial-chip';
+    c.innerHTML = escapeHtml(s)+' <span onclick="removeSerial('+i+')">✕</span>';
+    box.appendChild(c);
+  });
+  var done = item.serials.length >= item.qty;
+  document.getElementById('scanNextBtn').disabled = !done;
+  document.getElementById('scanNextBtn').textContent = done ? (state.scanIdx+1 < state.scanQueue.length ? 'Next item' : 'Continue') : (item.serials.length+' / '+item.qty+' scanned');
+}
+
+function addSerial(raw){
+  var item = state.scanQueue[state.scanIdx];
+  var s = String(raw||'').trim();
+  if(!s) return;
+  var all = [];
+  state.scanQueue.forEach(function(l){ (l.serials||[]).forEach(function(x){ all.push(x); }); });
+  if(all.indexOf(s) !== -1){ err('scanErr','Serial "'+s+'" already scanned.'); return; }
+  if(item.serials.length >= item.qty){ err('scanErr','Already have '+item.qty+' serial(s) for this item.'); return; }
+  err('scanErr','');
+  item.serials.push(s);
+  if(navigator.vibrate) navigator.vibrate(80);
+  renderChips();
+}
+
+function removeSerial(i){ state.scanQueue[state.scanIdx].serials.splice(i,1); renderChips(); }
+function addManualSerial(){ addSerial(document.getElementById('manualSerial').value); document.getElementById('manualSerial').value=''; }
+
+function toggleCamera(){
+  if(state.cameraOn){ stopCamera(); return; }
+  if(!window.isSecureContext){
+    err('scanErr','Camera needs a secure (https://) page. Re-open this app with an https:// address, or use manual entry.');
+    return;
+  }
+  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+    err('scanErr','This browser blocks camera access. Try opening the app in Chrome, or use manual entry.');
+    return;
+  }
+  var formats = [Html5QrcodeSupportedFormats.CODE_128, Html5QrcodeSupportedFormats.QR_CODE, Html5QrcodeSupportedFormats.EAN_13, Html5QrcodeSupportedFormats.CODE_39];
+  state.scanner = new Html5Qrcode('reader', { formatsToSupport: formats });
+  state.scanner.start({ facingMode:'environment' }, { fps:10, qrbox:{ width:280, height:120 } },
+    function(text){ addSerial(text); },
+    function(){ /* per-frame decode misses are normal */ }
+  ).then(function(){ state.cameraOn=true; document.getElementById('camBtn').textContent='⏹ Stop camera'; })
+   .catch(function(e){
+     var msg = String(e);
+     if(msg.indexOf('NotAllowedError') !== -1) msg = 'Camera permission was denied — allow camera for this site in browser settings, then retry.';
+     else if(msg.indexOf('SecurityError') !== -1) msg = 'Browser blocked the camera (security policy). Try Chrome, or use manual entry.';
+     else msg = 'Camera failed: ' + msg;
+     err('scanErr', msg + ' Manual entry below always works.');
+   });
+}
+
+function stopCamera(){
+  if(state.scanner && state.cameraOn){ state.scanner.stop().catch(function(){}); }
+  state.cameraOn=false; document.getElementById('camBtn').textContent='📷 Start camera';
+}
+
+function nextScanItem(){
+  stopCamera();
+  if(state.scanIdx+1 < state.scanQueue.length){ state.scanIdx++; startScanStep(); }
+  else { renderConfirm(); show('step4'); }
+}
+
+function backToLines(){ stopCamera(); show('step2'); }
+
+function renderConfirm(){
+  var loc = document.getElementById('locationSel').value;
+  var box = document.getElementById('confirmBox'); box.innerHTML='';
+  state.toReceive.forEach(function(l){
+    var d = document.createElement('div'); d.className='line';
+    d.innerHTML = '<div class="line-info"><div class="line-name">'+escapeHtml(l.itemName)+'</div>' +
+      '<div class="line-meta">'+escapeHtml(l.sku)+' · qty '+l.qty+(l.highValue ? ' · serials: '+l.serials.map(escapeHtml).join(', ') : '')+'</div></div>';
+    box.appendChild(d);
+  });
+  var d2 = document.createElement('div'); d2.className='muted'; d2.style.marginTop='8px';
+  d2.textContent = 'Into: '+loc;
+  box.appendChild(d2);
+}
+
+async function submitReceive(){
+  err('submitErr','');
+  document.getElementById('submitBtn').disabled = true;
+  show('loading');
+  var body = {
+    poNumber: state.poNumber,
+    location: document.getElementById('locationSel').value,
+    staffId: document.getElementById('staffInput').value.trim() || 'warehouse',
+    lines: state.toReceive.map(function(l){ return { lineKey:l.lineKey, sku:l.sku, qty:l.qty, serials:l.serials||[] }; })
+  };
+  var res = await api('/webhook/api-po-receive', body);
+  document.getElementById('submitBtn').disabled = false;
+  if(res.ok){
+    document.getElementById('resultIcon').textContent='✅';
+    document.getElementById('resultTitle').textContent='Received!';
+    document.getElementById('resultDetail').textContent = (res.linesProcessed||body.lines.length)+' line(s) received into '+body.location+' on PO '+state.poNumber+'.';
+    show('step5');
+  } else {
+    show('step4');
+    err('submitErr', res.error || 'Something went wrong. Nothing may have been saved — check with admin before retrying.');
+  }
+}
+
+function resetApp(){ stopCamera(); state = { poNumber:'', lines:[], locations:['Warehouse'], toReceive:[], scanQueue:[], scanIdx:0, scanner:null, cameraOn:false }; document.getElementById('poInput').value=''; err('lookupErr',''); show('step1'); }
+
+function escapeHtml(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+document.getElementById('poInput').addEventListener('keydown', function(e){ if(e.key==='Enter') lookupPO(); });
+document.getElementById('manualSerial').addEventListener('keydown', function(e){ if(e.key==='Enter'){ e.preventDefault(); addManualSerial(); } });
+</script>
+</body>
+</html>

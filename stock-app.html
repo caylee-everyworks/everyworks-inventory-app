@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Everyworks — Stock Movement</title>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<style>
+  :root { --blue:#1a73e8; --green:#188038; --red:#d93025; --grey:#5f6368; --bg:#f6f8fa; }
+  * { box-sizing:border-box; margin:0; padding:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; }
+  body { background:var(--bg); color:#202124; padding-bottom:40px; }
+  header { background:#0b5394; color:#fff; padding:14px 16px; font-size:17px; font-weight:600; position:sticky; top:0; z-index:10; display:flex; justify-content:space-between; align-items:center; }
+  header .who { font-size:12px; font-weight:400; opacity:.85; }
+  .step { max-width:560px; margin:0 auto; padding:16px; }
+  .card { background:#fff; border:1px solid #dadce0; border-radius:10px; padding:14px; margin-bottom:12px; }
+  h2 { font-size:15px; color:var(--grey); margin-bottom:10px; text-transform:uppercase; letter-spacing:.4px; }
+  label { display:block; font-size:13px; color:var(--grey); margin:8px 0 4px; }
+  input[type=text], input[type=number], input[type=password], input[type=date], select {
+    width:100%; padding:11px 12px; font-size:16px; border:1px solid #dadce0; border-radius:8px; background:#fff;
+  }
+  input:focus, select:focus { outline:2px solid var(--blue); border-color:var(--blue); }
+  button { width:100%; padding:13px; font-size:16px; font-weight:600; border:none; border-radius:8px; cursor:pointer; margin-top:10px; }
+  .btn-primary { background:var(--blue); color:#fff; }
+  .btn-secondary { background:#e8f0fe; color:var(--blue); }
+  .btn-green { background:var(--green); color:#fff; }
+  .btn-plain { background:#f1f3f4; color:#202124; }
+  button:disabled { opacity:.45; cursor:default; }
+  .line { display:flex; align-items:flex-start; gap:10px; padding:12px 0; border-bottom:1px solid #f0f0f0; }
+  .line:last-child { border-bottom:none; }
+  .line input[type=checkbox] { width:22px; height:22px; margin-top:3px; flex-shrink:0; }
+  .line-info { flex:1; min-width:0; }
+  .line-name { font-weight:600; font-size:15px; }
+  .line-meta { font-size:13px; color:var(--grey); margin-top:2px; }
+  .badge { display:inline-block; font-size:11px; font-weight:700; padding:2px 7px; border-radius:10px; background:#fce8e6; color:var(--red); margin-left:6px; vertical-align:1px; }
+  .badge-extra { background:#e8f0fe; color:var(--blue); }
+  .qty-box { flex-shrink:0; display:flex; align-items:center; gap:4px; }
+  .qty-box input { text-align:center; padding:9px 2px; width:46px; }
+  .qty-step { width:36px; height:40px; font-size:20px; font-weight:700; border:1px solid #dadce0; border-radius:8px; background:#f1f3f4; color:var(--blue); padding:0; margin:0; flex-shrink:0; }
+  .error { color:var(--red); font-size:14px; margin-top:8px; }
+  .muted { color:var(--grey); font-size:13px; }
+  #reader { width:100%; border-radius:8px; overflow:hidden; margin-top:8px; }
+  .serial-chip { display:inline-flex; align-items:center; gap:6px; background:#e6f4ea; color:var(--green); font-size:13px; font-weight:600; padding:5px 10px; border-radius:14px; margin:4px 4px 0 0; }
+  .serial-chip span { cursor:pointer; color:var(--red); font-weight:700; }
+  .progress { font-size:14px; font-weight:600; color:var(--blue); margin-bottom:6px; }
+  .result-icon { font-size:52px; text-align:center; margin:18px 0 6px; }
+  .result-title { text-align:center; font-size:19px; font-weight:700; margin-bottom:6px; }
+  .result-detail { text-align:center; font-size:14px; color:var(--grey); }
+  .spinner { border:3px solid #e8eaed; border-top:3px solid var(--blue); border-radius:50%; width:28px; height:28px; animation:spin .8s linear infinite; margin:14px auto; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  .hidden { display:none; }
+  .row { display:flex; gap:8px; }
+  .row > * { flex:1; }
+  .datebar { display:flex; align-items:center; gap:8px; margin-bottom:10px; }
+  .datebar button { width:46px; margin:0; padding:10px 0; font-size:18px; }
+  .datebar .datelabel { flex:1; text-align:center; font-weight:700; font-size:15px; }
+  .job { padding:12px; border:1px solid #dadce0; border-radius:10px; margin-bottom:10px; background:#fff; cursor:pointer; }
+  .job:active { background:#e8f0fe; }
+  .job-time { font-weight:700; color:var(--blue); font-size:14px; }
+  .job-title { font-weight:600; font-size:15px; margin-top:2px; }
+  .job-meta { font-size:13px; color:var(--grey); margin-top:2px; }
+  .logout { color:#fff; background:none; border:none; width:auto; margin:0; padding:4px 8px; font-size:12px; text-decoration:underline; cursor:pointer; }
+</style>
+</head>
+<body>
+<header>
+  <span>🔧 Stock Movement</span>
+  <span class="who" id="whoami"></span>
+</header>
+
+<!-- LOGIN -->
+<div class="step" id="login">
+  <div class="card">
+    <h2>Sign in</h2>
+    <label>Staff ID</label>
+    <input type="text" id="staffId" placeholder="STAFF001" autocomplete="off" autocapitalize="characters">
+    <label>PIN</label>
+    <input type="password" id="pin" placeholder="••••" inputmode="numeric" autocomplete="off">
+    <button class="btn-primary" id="loginBtn" onclick="doLogin()">Sign in</button>
+    <div class="error hidden" id="loginErr"></div>
+  </div>
+</div>
+
+<!-- DASHBOARD -->
+<div class="step hidden" id="dashboard">
+  <div class="card">
+    <h2>My jobs</h2>
+    <div class="datebar">
+      <button class="btn-plain" onclick="shiftDay(-1)">‹</button>
+      <div class="datelabel" id="dateLabel"></div>
+      <button class="btn-plain" onclick="shiftDay(1)">›</button>
+    </div>
+    <div id="jobsBox"><div class="muted">Loading…</div></div>
+  </div>
+  <div class="card">
+    <h2>Or enter a job number</h2>
+    <div class="row">
+      <input type="text" id="jobNumInput" placeholder="e.g. 747367" inputmode="numeric">
+      <button class="btn-secondary" style="flex:0 0 auto; width:auto; padding:11px 16px; margin:0;" onclick="openJobFromInput()">Open</button>
+    </div>
+  </div>
+  <button class="logout" style="color:var(--grey);" onclick="logout()">Sign out</button>
+</div>
+
+<!-- JOB VIEW -->
+<div class="step hidden" id="jobview">
+  <div class="card">
+    <h2>Job <span id="jobLabel"></span></h2>
+    <div class="muted" id="jobCustomer"></div>
+    <div id="jobLinesBox" style="margin-top:6px;"></div>
+    <button class="btn-secondary" onclick="startExtraItem()">＋ Extra item (not reserved)</button>
+  </div>
+  <div class="card">
+    <h2>Where is the stock going?</h2>
+    <div class="line" style="border:none; padding:6px 0;">
+      <input type="checkbox" id="toVan" onchange="renderDestination()">
+      <div class="line-info"><div class="line-name" style="font-size:14px;">Move to van</div>
+      <div class="line-meta">unticked = you carry it (booked to your staff ID)</div></div>
+    </div>
+    <select id="vanSel" class="hidden"></select>
+  </div>
+  <button class="btn-primary" onclick="continueTake()">Continue</button>
+  <button class="btn-plain" onclick="backToDashboard()">Back to jobs</button>
+  <div class="error hidden" id="jobErr"></div>
+</div>
+
+<!-- EXTRA ITEM -->
+<div class="step hidden" id="extraview">
+  <div class="card">
+    <h2>Extra item</h2>
+    <div class="muted">Scan the item's SKU barcode or type the SKU.</div>
+    <div id="skuReader" style="width:100%; border-radius:8px; overflow:hidden; margin-top:8px;"></div>
+    <button class="btn-secondary" id="skuCamBtn" onclick="toggleSkuCamera()">📷 Scan SKU</button>
+    <label>SKU</label>
+    <input type="text" id="extraSku" placeholder="e.g. EH0001" autocomplete="off" autocapitalize="characters">
+    <label>Quantity</label>
+    <div class="qty-box" style="justify-content:center;">
+      <button type="button" class="qty-step" onclick="stepExtraQty(-1)">−</button>
+      <input type="number" id="extraQty" min="1" value="1" inputmode="numeric" style="width:60px;">
+      <button type="button" class="qty-step" onclick="stepExtraQty(1)">+</button>
+    </div>
+    <div class="error hidden" id="extraErr"></div>
+  </div>
+  <button class="btn-primary" onclick="addExtraLine()">Add to list</button>
+  <button class="btn-plain" onclick="cancelExtra()">Cancel</button>
+</div>
+
+<!-- SERIAL SCAN -->
+<div class="step hidden" id="scanview">
+  <div class="card">
+    <div class="progress" id="scanProgress"></div>
+    <div class="line-name" id="scanItemName"></div>
+    <div class="muted">Any serial of this SKU is fine — scan the sticker on whichever unit you grabbed.</div>
+    <div id="reader"></div>
+    <button class="btn-secondary" id="camBtn" onclick="toggleCamera()">📷 Start camera</button>
+    <div class="row" style="margin-top:10px;">
+      <input type="text" id="manualSerial" placeholder="Type serial number" autocomplete="off">
+      <button class="btn-secondary" style="flex:0 0 auto; width:auto; padding:8px 14px; margin:0;" onclick="addManualSerial()">Add</button>
+    </div>
+    <div id="serialChips" style="margin-top:8px;"></div>
+    <div class="error hidden" id="scanErr"></div>
+  </div>
+  <button class="btn-primary" id="scanNextBtn" onclick="nextScanItem()" disabled>Next</button>
+  <button class="btn-plain" onclick="stopCamera(); show('jobview')">Back</button>
+</div>
+
+<!-- CONFIRM -->
+<div class="step hidden" id="confirmview">
+  <div class="card">
+    <h2>Confirm take-out</h2>
+    <div id="confirmBox"></div>
+  </div>
+  <button class="btn-green" id="takeBtn" onclick="submitTake()">✓ Confirm — I have taken these</button>
+  <button class="btn-plain" onclick="show('jobview')">Back</button>
+  <div class="error hidden" id="takeErr"></div>
+</div>
+
+<!-- RESULT -->
+<div class="step hidden" id="resultview">
+  <div class="card">
+    <div class="result-icon" id="resultIcon">✅</div>
+    <div class="result-title" id="resultTitle"></div>
+    <div class="result-detail" id="resultDetail"></div>
+  </div>
+  <button class="btn-primary" onclick="backToDashboard()">Back to my jobs</button>
+</div>
+
+<div class="step hidden" id="loading"><div class="card"><div class="spinner"></div><div class="muted" style="text-align:center;">Working…</div></div></div>
+
+<script>
+var N8N_BASE = 'https://n8n-jpnq.srv1784919.hstgr.cloud';
+var AUTH_KEY = 'ew_stock_auth';
+var auth = null;
+try { auth = JSON.parse(localStorage.getItem(AUTH_KEY) || 'null'); } catch(e){}
+
+var state = {
+  date: todayStr(),
+  jobs: [],
+  jobNumber: '', customer: '',
+  lines: [],        // from api: {lineKey, sku, itemName, qty, pickedQty, highValue}
+  extraLines: [],   // added client-side: {sku, qty, isExtra:true}
+  vans: [],
+  toTake: [],       // built at continue: {lineKey?, sku, itemName, qty, highValue?, isExtra, serials[]}
+  scanQueue: [], scanIdx: 0,
+  scanner: null, cameraOn: false,
+  skuScanner: null, skuCameraOn: false
+};
+
+function todayStr(){ var d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function show(id){ ['login','dashboard','jobview','extraview','scanview','confirmview','resultview','loading'].forEach(function(s){ document.getElementById(s).classList.toggle('hidden', s!==id); }); }
+function err(id,msg){ var e=document.getElementById(id); if(msg){ e.textContent=msg; e.classList.remove('hidden'); } else e.classList.add('hidden'); }
+function escapeHtml(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+async function api(path, body){
+  var payload = Object.assign({}, body || {});
+  if(auth){ payload.staffId = auth.staffId; payload.token = auth.token; }
+  var r = await fetch(N8N_BASE + path, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) });
+  var t = await r.text();
+  var j; try { j = JSON.parse(t); } catch(e){ j = { ok:false, error:'Bad response: '+t.slice(0,120) }; }
+  if(j.error === 'auth'){ logout(); j.error = 'Session expired — please sign in again.'; }
+  return j;
+}
+
+// ---------- login ----------
+async function doLogin(){
+  err('loginErr','');
+  var sid = document.getElementById('staffId').value.trim();
+  var pin = document.getElementById('pin').value.trim();
+  if(!sid || !pin){ err('loginErr','Enter your Staff ID and PIN.'); return; }
+  document.getElementById('loginBtn').disabled = true;
+  show('loading');
+  var res = await api('/webhook/api-stock-login', { loginStaffId: sid, pin: pin });
+  document.getElementById('loginBtn').disabled = false;
+  if(!res.ok){ show('login'); err('loginErr', res.error || 'Wrong Staff ID or PIN.'); return; }
+  auth = { token: res.token, staffId: res.staffId, name: res.name, role: res.role, defaultVan: res.defaultVan || '' };
+  localStorage.setItem(AUTH_KEY, JSON.stringify(auth));
+  enterDashboard();
+}
+
+function logout(){ auth = null; localStorage.removeItem(AUTH_KEY); document.getElementById('whoami').textContent=''; show('login'); }
+
+function enterDashboard(){
+  document.getElementById('whoami').textContent = auth.name + ' (' + auth.staffId + ')';
+  state.date = todayStr();
+  loadJobs();
+}
+
+// ---------- dashboard ----------
+function shiftDay(delta){
+  var d = new Date(state.date + 'T00:00:00');
+  d.setDate(d.getDate() + delta);
+  state.date = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  loadJobs();
+}
+
+async function loadJobs(){
+  show('dashboard');
+  var lbl = document.getElementById('dateLabel');
+  lbl.textContent = (state.date === todayStr() ? 'Today · ' : '') + state.date;
+  var box = document.getElementById('jobsBox');
+  box.innerHTML = '<div class="muted">Loading…</div>';
+  var res = await api('/webhook/api-stock-jobs', { date: state.date });
+  if(!res.ok){ box.innerHTML = '<div class="error">'+escapeHtml(res.error||'Could not load jobs')+'</div>'; return; }
+  state.jobs = res.jobs || [];
+  if(!state.jobs.length){ box.innerHTML = '<div class="muted">No jobs for this day.</div>'; return; }
+  box.innerHTML = '';
+  state.jobs.forEach(function(j){
+    var d = document.createElement('div'); d.className='job';
+    d.innerHTML = '<div class="job-time">'+escapeHtml(j.time)+'</div>' +
+      '<div class="job-title">#'+escapeHtml(j.jobNumber)+' · '+escapeHtml(j.name)+'</div>' +
+      '<div class="job-meta">'+escapeHtml(j.customer||'')+'</div>' +
+      '<div class="job-meta">'+escapeHtml(j.address||'')+'</div>';
+    d.onclick = function(){ openJob(String(j.jobNumber)); };
+    box.appendChild(d);
+  });
+}
+
+function openJobFromInput(){
+  var n = document.getElementById('jobNumInput').value.trim().replace(/\D/g,'');
+  if(n) openJob(n);
+}
+
+function backToDashboard(){ stopCamera(); state.extraLines=[]; loadJobs(); }
+
+// ---------- job view ----------
+async function openJob(jobNumber){
+  show('loading');
+  var res = await api('/webhook/api-stock-job', { jobNumber: jobNumber });
+  if(!res.ok){ show('dashboard'); alert(res.error || 'Could not load job'); return; }
+  state.jobNumber = jobNumber;
+  state.customer = res.customer || '';
+  state.lines = res.lines || [];
+  state.vans = res.vans || [];
+  state.extraLines = [];
+  renderJob();
+  show('jobview');
+}
+
+function renderJob(){
+  document.getElementById('jobLabel').textContent = '#'+state.jobNumber;
+  document.getElementById('jobCustomer').textContent = state.customer;
+  var box = document.getElementById('jobLinesBox'); box.innerHTML='';
+  err('jobErr','');
+  if(!state.lines.length && !state.extraLines.length){
+    box.innerHTML = '<div class="muted" style="padding:10px 0;">No reserved items on this job. Use "Extra item" if you need to take stock.</div>';
+  }
+  state.lines.forEach(function(l, i){
+    var remaining = Math.max(0, (l.qty||0) - (l.pickedQty||0));
+    var div = document.createElement('div'); div.className='line';
+    div.innerHTML =
+      '<input type="checkbox" id="tchk'+i+'" '+(remaining>0?'checked':'')+'>' +
+      '<div class="line-info"><div class="line-name">'+escapeHtml(l.itemName||l.sku)+(l.highValue?'<span class="badge">SERIAL</span>':'')+'</div>' +
+      '<div class="line-meta">'+escapeHtml(l.sku)+' · reserved '+(l.qty||0)+(l.pickedQty?' · already taken '+l.pickedQty:'')+'</div></div>' +
+      '<div class="qty-box"><button type="button" class="qty-step" onclick="stepTakeQty('+i+',-1)">−</button>' +
+      '<input type="number" id="tqty'+i+'" min="0" value="'+remaining+'" inputmode="numeric">' +
+      '<button type="button" class="qty-step" onclick="stepTakeQty('+i+',1)">+</button></div>';
+    box.appendChild(div);
+  });
+  state.extraLines.forEach(function(l, i){
+    var div = document.createElement('div'); div.className='line';
+    div.innerHTML =
+      '<input type="checkbox" id="xchk'+i+'" checked>' +
+      '<div class="line-info"><div class="line-name">'+escapeHtml(l.sku)+'<span class="badge badge-extra">EXTRA</span></div>' +
+      '<div class="line-meta">extra item · qty '+l.qty+'</div></div>';
+    box.appendChild(div);
+  });
+  renderDestination();
+}
+
+function stepTakeQty(i, delta){
+  var inp = document.getElementById('tqty'+i);
+  inp.value = Math.max(0, Math.min(999, (parseInt(inp.value,10)||0) + delta));
+}
+
+function renderDestination(){
+  var toVan = document.getElementById('toVan').checked;
+  var sel = document.getElementById('vanSel');
+  sel.classList.toggle('hidden', !toVan);
+  if(toVan && !sel.options.length){
+    state.vans.forEach(function(v){ var o=document.createElement('option'); o.value=v; o.textContent=v; sel.appendChild(o); });
+    if(auth.defaultVan && state.vans.indexOf(auth.defaultVan)!==-1) sel.value = auth.defaultVan;
+  }
+}
+
+// ---------- extra item ----------
+function startExtraItem(){ err('extraErr',''); document.getElementById('extraSku').value=''; document.getElementById('extraQty').value=1; show('extraview'); }
+function cancelExtra(){ stopSkuCamera(); show('jobview'); }
+function stepExtraQty(delta){
+  var inp = document.getElementById('extraQty');
+  inp.value = Math.max(1, Math.min(999, (parseInt(inp.value,10)||1) + delta));
+}
+function addExtraLine(){
+  var sku = document.getElementById('extraSku').value.trim().toUpperCase();
+  var qty = parseInt(document.getElementById('extraQty').value,10)||0;
+  if(!sku){ err('extraErr','Enter or scan a SKU.'); return; }
+  if(qty<1){ err('extraErr','Quantity must be at least 1.'); return; }
+  stopSkuCamera();
+  var existing = state.extraLines.find(function(l){ return l.sku===sku; });
+  if(existing) existing.qty += qty; else state.extraLines.push({ sku:sku, qty:qty, isExtra:true });
+  renderJob();
+  show('jobview');
+}
+
+function toggleSkuCamera(){
+  if(state.skuCameraOn){ stopSkuCamera(); return; }
+  if(!window.isSecureContext || !navigator.mediaDevices){ err('extraErr','Camera unavailable — type the SKU instead.'); return; }
+  var formats = [Html5QrcodeSupportedFormats.CODE_128, Html5QrcodeSupportedFormats.QR_CODE, Html5QrcodeSupportedFormats.EAN_13, Html5QrcodeSupportedFormats.CODE_39];
+  state.skuScanner = new Html5Qrcode('skuReader', { formatsToSupport: formats });
+  state.skuScanner.start({ facingMode:'environment' }, { fps:10, qrbox:{ width:280, height:120 } },
+    function(text){ document.getElementById('extraSku').value = String(text).trim().toUpperCase(); if(navigator.vibrate) navigator.vibrate(80); stopSkuCamera(); },
+    function(){}
+  ).then(function(){ state.skuCameraOn=true; document.getElementById('skuCamBtn').textContent='⏹ Stop camera'; })
+   .catch(function(e){ err('extraErr','Camera failed — type the SKU instead.'); });
+}
+function stopSkuCamera(){
+  if(state.skuScanner && state.skuCameraOn){ state.skuScanner.stop().catch(function(){}); }
+  state.skuCameraOn=false; document.getElementById('skuCamBtn').textContent='📷 Scan SKU';
+}
+
+// ---------- take flow ----------
+function continueTake(){
+  err('jobErr','');
+  var toTake = [];
+  state.lines.forEach(function(l, i){
+    var chk = document.getElementById('tchk'+i);
+    var qty = parseInt((document.getElementById('tqty'+i)||{}).value,10)||0;
+    if(chk && chk.checked && qty>0) toTake.push({ lineKey:l.lineKey, sku:l.sku, itemName:l.itemName, qty:qty, highValue:!!l.highValue, isExtra:false, serials:[] });
+  });
+  state.extraLines.forEach(function(l, i){
+    var chk = document.getElementById('xchk'+i);
+    if(chk && chk.checked && l.qty>0) toTake.push({ sku:l.sku, itemName:l.sku, qty:l.qty, highValue:false, isExtra:true, serials:[] });
+  });
+  if(!toTake.length){ err('jobErr','Tick at least one item with a quantity above zero.'); return; }
+  state.toTake = toTake;
+  state.scanQueue = toTake.filter(function(l){ return l.highValue; });
+  state.scanIdx = 0;
+  if(state.scanQueue.length) startScanStep(); else { renderConfirm(); show('confirmview'); }
+}
+
+function destination(){
+  return document.getElementById('toVan').checked ? (document.getElementById('vanSel').value || 'Van') : auth.staffId;
+}
+
+function startScanStep(){
+  var item = state.scanQueue[state.scanIdx];
+  item.serials = item.serials || [];
+  document.getElementById('scanProgress').textContent = 'Item '+(state.scanIdx+1)+' of '+state.scanQueue.length;
+  document.getElementById('scanItemName').textContent = (item.itemName||item.sku)+' — scan '+item.qty+' serial'+(item.qty>1?'s':'');
+  document.getElementById('manualSerial').value='';
+  err('scanErr','');
+  renderChips();
+  show('scanview');
+}
+
+function renderChips(){
+  var item = state.scanQueue[state.scanIdx];
+  var box = document.getElementById('serialChips'); box.innerHTML='';
+  item.serials.forEach(function(s, i){
+    var c = document.createElement('div'); c.className='serial-chip';
+    c.innerHTML = escapeHtml(s)+' <span onclick="removeSerial('+i+')">✕</span>';
+    box.appendChild(c);
+  });
+  var done = item.serials.length >= item.qty;
+  document.getElementById('scanNextBtn').disabled = !done;
+  document.getElementById('scanNextBtn').textContent = done ? (state.scanIdx+1 < state.scanQueue.length ? 'Next item' : 'Continue') : (item.serials.length+' / '+item.qty+' scanned');
+}
+
+function addSerial(raw){
+  var item = state.scanQueue[state.scanIdx];
+  var s = String(raw||'').trim();
+  if(!s) return;
+  var all = [];
+  state.scanQueue.forEach(function(l){ (l.serials||[]).forEach(function(x){ all.push(x); }); });
+  if(all.indexOf(s) !== -1){ err('scanErr','Serial "'+s+'" already scanned.'); return; }
+  if(item.serials.length >= item.qty){ err('scanErr','Already have '+item.qty+' serial(s) for this item.'); return; }
+  err('scanErr','');
+  item.serials.push(s);
+  if(navigator.vibrate) navigator.vibrate(80);
+  renderChips();
+}
+function removeSerial(i){ state.scanQueue[state.scanIdx].serials.splice(i,1); renderChips(); }
+function addManualSerial(){ addSerial(document.getElementById('manualSerial').value); document.getElementById('manualSerial').value=''; }
+
+function toggleCamera(){
+  if(state.cameraOn){ stopCamera(); return; }
+  if(!window.isSecureContext){ err('scanErr','Camera needs an https:// page — use manual entry.'); return; }
+  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){ err('scanErr','This browser blocks the camera — try Chrome or manual entry.'); return; }
+  var formats = [Html5QrcodeSupportedFormats.CODE_128, Html5QrcodeSupportedFormats.QR_CODE, Html5QrcodeSupportedFormats.EAN_13, Html5QrcodeSupportedFormats.CODE_39];
+  state.scanner = new Html5Qrcode('reader', { formatsToSupport: formats });
+  state.scanner.start({ facingMode:'environment' }, { fps:10, qrbox:{ width:280, height:120 } },
+    function(text){ addSerial(text); },
+    function(){}
+  ).then(function(){ state.cameraOn=true; document.getElementById('camBtn').textContent='⏹ Stop camera'; })
+   .catch(function(e){
+     var msg = String(e);
+     if(msg.indexOf('NotAllowedError') !== -1) msg = 'Camera permission denied — allow it in browser settings.';
+     else if(msg.indexOf('SecurityError') !== -1) msg = 'Browser blocked the camera (security policy). Try Chrome.';
+     else msg = 'Camera failed: '+msg;
+     err('scanErr', msg+' Manual entry below always works.');
+   });
+}
+function stopCamera(){
+  if(state.scanner && state.cameraOn){ state.scanner.stop().catch(function(){}); }
+  state.cameraOn=false;
+  var b=document.getElementById('camBtn'); if(b) b.textContent='📷 Start camera';
+}
+
+function nextScanItem(){
+  stopCamera();
+  if(state.scanIdx+1 < state.scanQueue.length){ state.scanIdx++; startScanStep(); }
+  else { renderConfirm(); show('confirmview'); }
+}
+
+function renderConfirm(){
+  var box = document.getElementById('confirmBox'); box.innerHTML='';
+  err('takeErr','');
+  state.toTake.forEach(function(l){
+    var d = document.createElement('div'); d.className='line';
+    d.innerHTML = '<div class="line-info"><div class="line-name">'+escapeHtml(l.itemName||l.sku)+(l.isExtra?'<span class="badge badge-extra">EXTRA</span>':'')+'</div>' +
+      '<div class="line-meta">'+escapeHtml(l.sku)+' · qty '+l.qty+(l.serials && l.serials.length ? ' · serials: '+l.serials.map(escapeHtml).join(', ') : '')+'</div></div>';
+    box.appendChild(d);
+  });
+  var d2 = document.createElement('div'); d2.className='muted'; d2.style.marginTop='8px';
+  d2.textContent = 'Going to: ' + destination();
+  box.appendChild(d2);
+}
+
+async function submitTake(){
+  err('takeErr','');
+  document.getElementById('takeBtn').disabled = true;
+  show('loading');
+  var res = await api('/webhook/api-take-items', {
+    jobNumber: state.jobNumber,
+    destination: destination(),
+    lines: state.toTake.map(function(l){ return { lineKey:l.lineKey||'', sku:l.sku, qty:l.qty, isExtra:!!l.isExtra, serials:l.serials||[] }; })
+  });
+  document.getElementById('takeBtn').disabled = false;
+  if(res.ok){
+    document.getElementById('resultIcon').textContent='✅';
+    document.getElementById('resultTitle').textContent='Stock booked out';
+    document.getElementById('resultDetail').textContent=(res.linesProcessed||state.toTake.length)+' line(s) moved to '+destination()+' for job #'+state.jobNumber+'.';
+    show('resultview');
+  } else if(res.needsSerials && res.needsSerials.length){
+    // server says some (extra) lines need serial scans
+    res.needsSerials.forEach(function(ns){
+      var line = state.toTake.find(function(l){ return l.sku===ns.sku; });
+      if(line){ line.highValue = true; line.itemName = ns.itemName || line.itemName; }
+    });
+    state.scanQueue = state.toTake.filter(function(l){ return l.highValue && (l.serials||[]).length < l.qty; });
+    state.scanIdx = 0;
+    if(state.scanQueue.length){ startScanStep(); } else { show('confirmview'); err('takeErr', res.error||'Serials required.'); }
+  } else {
+    show('confirmview');
+    err('takeErr', res.error || 'Something went wrong — check with admin before retrying.');
+  }
+}
+
+// ---------- boot ----------
+document.getElementById('pin').addEventListener('keydown', function(e){ if(e.key==='Enter') doLogin(); });
+document.getElementById('jobNumInput').addEventListener('keydown', function(e){ if(e.key==='Enter') openJobFromInput(); });
+document.getElementById('manualSerial').addEventListener('keydown', function(e){ if(e.key==='Enter'){ e.preventDefault(); addManualSerial(); } });
+if(auth && auth.token){ enterDashboard(); } else { show('login'); }
+</script>
+</body>
+</html>
