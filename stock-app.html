@@ -320,7 +320,10 @@ function renderJob(){
     div.innerHTML =
       '<input type="checkbox" id="xchk'+i+'" checked>' +
       '<div class="line-info"><div class="line-name">'+escapeHtml(l.sku)+'<span class="badge badge-extra">EXTRA</span></div>' +
-      '<div class="line-meta">extra item · qty '+l.qty+'</div></div>';
+      '<div class="line-meta">extra item</div></div>' +
+      '<div class="qty-box"><button type="button" class="qty-step" onclick="stepExtraLineQty('+i+',-1)">−</button>' +
+      '<input type="number" id="xqty'+i+'" min="0" value="'+l.qty+'" inputmode="numeric">' +
+      '<button type="button" class="qty-step" onclick="stepExtraLineQty('+i+',1)">+</button></div>';
     box.appendChild(div);
   });
   renderDestination();
@@ -328,6 +331,10 @@ function renderJob(){
 
 function stepTakeQty(i, delta){
   var inp = document.getElementById('tqty'+i);
+  inp.value = Math.max(0, Math.min(999, (parseInt(inp.value,10)||0) + delta));
+}
+function stepExtraLineQty(i, delta){
+  var inp = document.getElementById('xqty'+i);
   inp.value = Math.max(0, Math.min(999, (parseInt(inp.value,10)||0) + delta));
 }
 
@@ -387,7 +394,8 @@ function continueTake(){
   });
   state.extraLines.forEach(function(l, i){
     var chk = document.getElementById('xchk'+i);
-    if(chk && chk.checked && l.qty>0) toTake.push({ sku:l.sku, itemName:l.sku, qty:l.qty, highValue:false, isExtra:true, serials:[] });
+    var qty = parseInt((document.getElementById('xqty'+i)||{}).value,10)||0;
+    if(chk && chk.checked && qty>0) toTake.push({ sku:l.sku, itemName:l.sku, qty:qty, highValue:false, isExtra:true, serials:[] });
   });
   if(!toTake.length){ err('jobErr','Tick at least one item with a quantity above zero.'); return; }
   state.toTake = toTake;
@@ -422,6 +430,10 @@ function renderChips(){
   var done = item.serials.length >= item.qty;
   document.getElementById('scanNextBtn').disabled = !done;
   document.getElementById('scanNextBtn').textContent = done ? (state.scanIdx+1 < state.scanQueue.length ? 'Next item' : 'Continue') : (item.serials.length+' / '+item.qty+' scanned');
+  // once fully scanned, get the camera out of the way so the Next/Continue button
+  // is the obvious next step; it only comes back if a chip is removed
+  document.getElementById('camBtn').classList.toggle('hidden', done);
+  document.getElementById('reader').classList.toggle('hidden', done);
 }
 
 function addSerial(raw){
@@ -435,6 +447,7 @@ function addSerial(raw){
   err('scanErr','');
   item.serials.push(s);
   if(navigator.vibrate) navigator.vibrate(80);
+  if(state.cameraOn) stopCamera();
   renderChips();
   setTimeout(function(){ var mi=document.getElementById('manualSerial'); if(mi && mi.value===s) mi.value=''; }, 700);
 }

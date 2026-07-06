@@ -222,6 +222,10 @@ function renderChips(){
   var done = item.serials.length >= item.qty;
   document.getElementById('scanNextBtn').disabled = !done;
   document.getElementById('scanNextBtn').textContent = done ? (state.scanIdx+1 < state.scanQueue.length ? 'Next item' : 'Continue') : (item.serials.length+' / '+item.qty+' scanned');
+  // once fully scanned, get the camera out of the way so the Next/Continue button
+  // is the obvious next step; it only comes back if a chip is removed
+  document.getElementById('camBtn').classList.toggle('hidden', done);
+  document.getElementById('reader').classList.toggle('hidden', done);
 }
 
 function addSerial(raw){
@@ -235,6 +239,7 @@ function addSerial(raw){
   err('scanErr','');
   item.serials.push(s);
   if(navigator.vibrate) navigator.vibrate(80);
+  if(state.cameraOn) stopCamera();
   renderChips();
   setTimeout(function(){ var mi=document.getElementById('manualSerial'); if(mi && mi.value===s) mi.value=''; }, 700);
 }

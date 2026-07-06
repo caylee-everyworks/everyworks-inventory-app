@@ -1,7 +1,39 @@
 <!DOCTYPE html>
-<html><head><meta charset="UTF-8"><title>Everyworks Inventory</title></head>
-<body style="font-family:sans-serif; max-width:400px; margin:60px auto; text-align:center;">
-<h2>📦 Everyworks Inventory</h2>
-<p><a href="receive-app.html" style="display:block; padding:14px; background:#1a73e8; color:#fff; text-decoration:none; border-radius:8px; margin:10px 0;">Receiving</a></p>
-<p><a href="stock-app.html" style="display:block; padding:14px; background:#0b5394; color:#fff; text-decoration:none; border-radius:8px; margin:10px 0;">Stock Movement</a></p>
-</body></html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Everyworks Inventory</title>
+<style>
+  * { box-sizing:border-box; margin:0; padding:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; }
+  body { min-height:100vh; background:#f6f8fa; display:flex; align-items:center; justify-content:center; padding:24px; }
+  .wrap { width:100%; max-width:420px; }
+  h1 { text-align:center; font-size:24px; margin-bottom:32px; color:#202124; }
+  a.tile {
+    display:flex; align-items:center; gap:18px;
+    padding:26px 24px; margin-bottom:20px;
+    border-radius:16px; text-decoration:none; color:#fff;
+    box-shadow:0 2px 8px rgba(0,0,0,.12);
+  }
+  a.tile:active { transform:scale(0.98); }
+  .tile .icon { font-size:40px; line-height:1; flex-shrink:0; }
+  .tile .label { font-size:22px; font-weight:700; }
+  .tile .sub { font-size:14px; font-weight:400; opacity:.85; margin-top:2px; }
+  .receiving { background:#1a73e8; }
+  .stock { background:#0b5394; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>📦 Everyworks Inventory</h1>
+  <a class="tile receiving" href="receive-app.html">
+    <span class="icon">📥</span>
+    <span><span class="label">Receiving</span><br><span class="sub">Receive a Purchase Order</span></span>
+  </a>
+  <a class="tile stock" href="stock-app.html">
+    <span class="icon">🔧</span>
+    <span><span class="label">Stock Movement</span><br><span class="sub">Take items out for a job</span></span>
+  </a>
+</div>
+</body>
+</html>
