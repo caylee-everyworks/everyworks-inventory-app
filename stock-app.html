@@ -184,7 +184,7 @@
   <button class="btn-primary" onclick="backToDashboard()">Back to my jobs</button>
 </div>
 
-<div class="step hidden" id="loading"><div class="card"><div class="spinner"></div><div class="muted" style="text-align:center;">Working…</div></div></div>
+<div class="step hidden" id="loading"><div class="card"><div class="spinner"></div><div class="muted" id="loadingMsg" style="text-align:center;">Working…</div></div></div>
 
 <script>
 var N8N_BASE = 'https://n8n-jpnq.srv1784919.hstgr.cloud';
@@ -488,6 +488,7 @@ function renderConfirm(){
 async function submitTake(){
   err('takeErr','');
   document.getElementById('takeBtn').disabled = true;
+  document.getElementById('loadingMsg').textContent = 'Checking stock — this can take a few seconds…';
   show('loading');
   var res = await api('/webhook/api-take-items', {
     jobNumber: state.jobNumber,
