@@ -241,10 +241,9 @@ function addSerial(raw){
   if(navigator.vibrate) navigator.vibrate(80);
   if(state.cameraOn) stopCamera();
   renderChips();
-  setTimeout(function(){ var mi=document.getElementById('manualSerial'); if(mi && mi.value===s) mi.value=''; }, 700);
 }
 
-function removeSerial(i){ state.scanQueue[state.scanIdx].serials.splice(i,1); renderChips(); }
+function removeSerial(i){ state.scanQueue[state.scanIdx].serials.splice(i,1); document.getElementById('manualSerial').value=''; renderChips(); }
 function addManualSerial(){ addSerial(document.getElementById('manualSerial').value); document.getElementById('manualSerial').value=''; }
 
 function toggleCamera(){
