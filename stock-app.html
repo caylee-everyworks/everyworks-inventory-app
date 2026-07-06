@@ -436,6 +436,7 @@ function addSerial(raw){
   item.serials.push(s);
   if(navigator.vibrate) navigator.vibrate(80);
   renderChips();
+  setTimeout(function(){ var mi=document.getElementById('manualSerial'); if(mi && mi.value===s) mi.value=''; }, 700);
 }
 function removeSerial(i){ state.scanQueue[state.scanIdx].serials.splice(i,1); renderChips(); }
 function addManualSerial(){ addSerial(document.getElementById('manualSerial').value); document.getElementById('manualSerial').value=''; }
@@ -447,7 +448,7 @@ function toggleCamera(){
   var formats = [Html5QrcodeSupportedFormats.CODE_128, Html5QrcodeSupportedFormats.QR_CODE, Html5QrcodeSupportedFormats.EAN_13, Html5QrcodeSupportedFormats.CODE_39];
   state.scanner = new Html5Qrcode('reader', { formatsToSupport: formats });
   state.scanner.start({ facingMode:'environment' }, { fps:10, qrbox:{ width:280, height:120 } },
-    function(text){ addSerial(text); },
+    function(text){ document.getElementById('manualSerial').value = text; addSerial(text); },
     function(){}
   ).then(function(){ state.cameraOn=true; document.getElementById('camBtn').textContent='⏹ Stop camera'; })
    .catch(function(e){
