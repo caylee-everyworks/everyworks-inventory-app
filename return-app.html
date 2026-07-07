@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Everyworks — Return to Warehouse</title>
+<style>
+  :root { --blue:#1a73e8; --green:#188038; --red:#d93025; --grey:#5f6368; --bg:#f6f8fa; }
+  * { box-sizing:border-box; margin:0; padding:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; }
+  body { background:var(--bg); color:#202124; padding-bottom:40px; }
+  header { background:#0b5394; color:#fff; padding:14px 16px; font-size:17px; font-weight:600; position:sticky; top:0; z-index:10; display:flex; justify-content:space-between; align-items:center; }
+  header .who { font-size:12px; font-weight:400; opacity:.85; }
+  .step { max-width:560px; margin:0 auto; padding:16px; }
+  .card { background:#fff; border:1px solid #dadce0; border-radius:10px; padding:14px; margin-bottom:12px; }
+  h2 { font-size:15px; color:var(--grey); margin-bottom:10px; text-transform:uppercase; letter-spacing:.4px; }
+  label { display:block; font-size:13px; color:var(--grey); margin:8px 0 4px; }
+  input[type=text], input[type=number], input[type=password] {
+    width:100%; padding:11px 12px; font-size:16px; border:1px solid #dadce0; border-radius:8px; background:#fff;
+  }
+  input:focus { outline:2px solid var(--blue); border-color:var(--blue); }
+  button { width:100%; padding:13px; font-size:16px; font-weight:600; border:none; border-radius:8px; cursor:pointer; margin-top:10px; }
+  .btn-primary { background:var(--blue); color:#fff; }
+  .btn-green { background:var(--green); color:#fff; }
+  .btn-plain { background:#f1f3f4; color:#202124; }
+  button:disabled { opacity:.45; cursor:default; }
+  .line { display:flex; align-items:flex-start; gap:10px; padding:12px 0; border-bottom:1px solid #f0f0f0; }
+  .line:last-child { border-bottom:none; }
+  .line input[type=checkbox] { width:22px; height:22px; margin-top:3px; flex-shrink:0; }
+  .line-info { flex:1; min-width:0; }
+  .line-name { font-weight:600; font-size:15px; }
+  .line-meta { font-size:13px; color:var(--grey); margin-top:2px; }
+  .badge { display:inline-block; font-size:11px; font-weight:700; padding:2px 7px; border-radius:10px; background:#fce8e6; color:var(--red); margin-left:6px; vertical-align:1px; }
+  .qty-box { flex-shrink:0; display:flex; align-items:center; gap:4px; }
+  .qty-box input { text-align:center; padding:9px 2px; width:46px; }
+  .qty-step { width:36px; height:40px; font-size:20px; font-weight:700; border:1px solid #dadce0; border-radius:8px; background:#f1f3f4; color:var(--blue); padding:0; margin:0; flex-shrink:0; }
+  .serial-line { display:flex; align-items:center; gap:10px; padding:8px 0 8px 32px; }
+  .serial-line input[type=checkbox] { width:20px; height:20px; }
+  .serial-line .line-meta { font-size:13px; }
+  .error { color:var(--red); font-size:14px; margin-top:8px; }
+  .muted { color:var(--grey); font-size:13px; }
+  .result-icon { font-size:52px; text-align:center; margin:18px 0 6px; }
+  .result-title { text-align:center; font-size:19px; font-weight:700; margin-bottom:6px; }
+  .result-detail { text-align:center; font-size:14px; color:var(--grey); }
+  .spinner { border:3px solid #e8eaed; border-top:3px solid var(--blue); border-radius:50%; width:28px; height:28px; animation:spin .8s linear infinite; margin:14px auto; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  .hidden { display:none; }
+  .logout { color:#fff; background:none; border:none; width:auto; margin:0; padding:4px 8px; font-size:12px; text-decoration:underline; cursor:pointer; }
+</style>
+</head>
+<body>
+<header>
+  <span>↩️ Return to Warehouse</span>
+  <span class="who" id="whoami"></span>
+</header>
+
+<!-- LOGIN -->
+<div class="step" id="login">
+  <div class="card">
+    <h2>Sign in</h2>
+    <label>Staff ID</label>
+    <input type="text" id="staffId" placeholder="STAFF001" autocomplete="off" autocapitalize="characters">
+    <label>PIN</label>
+    <input type="password" id="pin" placeholder="••••" inputmode="numeric" autocomplete="off">
+    <button class="btn-primary" id="loginBtn" onclick="doLogin()">Sign in</button>
+    <div class="error hidden" id="loginErr"></div>
+  </div>
+</div>
+
+<!-- HOLDINGS -->
+<div class="step hidden" id="holdingsview">
+  <div class="card">
+    <h2>Stock currently with you</h2>
+    <div id="holdingsBox"><div class="muted">Loading…</div></div>
+  </div>
+  <button class="btn-primary" id="returnBtn" onclick="goConfirm()">Continue</button>
+  <button class="logout" style="color:var(--grey);" onclick="logout()">Sign out</button>
+  <div class="error hidden" id="holdingsErr"></div>
+</div>
+
+<!-- CONFIRM -->
+<div class="step hidden" id="confirmview">
+  <div class="card">
+    <h2>Confirm return to warehouse</h2>
+    <div id="confirmBox"></div>
+  </div>
+  <button class="btn-green" id="submitBtn" onclick="submitReturn()">✓ Confirm — returned to warehouse</button>
+  <button class="btn-plain" onclick="show('holdingsview')">Back</button>
+  <div class="error hidden" id="confirmErr"></div>
+</div>
+
+<!-- RESULT -->
+<div class="step hidden" id="resultview">
+  <div class="card">
+    <div class="result-icon" id="resultIcon">✅</div>
+    <div class="result-title" id="resultTitle"></div>
+    <div class="result-detail" id="resultDetail"></div>
+  </div>
+  <button class="btn-primary" onclick="enterHoldings()">Back to my holdings</button>
+</div>
+
+<div class="step hidden" id="loading"><div class="card"><div class="spinner"></div><div class="muted" style="text-align:center;">Working…</div></div></div>
+
+<script>
+var N8N_BASE = 'https://n8n-jpnq.srv1784919.hstgr.cloud';
+var AUTH_KEY = 'ew_return_auth';
+var auth = null;
+try { auth = JSON.parse(localStorage.getItem(AUTH_KEY) || 'null'); } catch(e){}
+
+var state = {
+  holdings: [],  // {sku, location, qty, itemName, highValue, serials:[{id,serialNumber}]}
+  toReturn: []   // built at confirm: {sku, qty, location, serials:[serialNumber,...]}
+};
+
+function show(id){ ['login','holdingsview','confirmview','resultview','loading'].forEach(function(s){ document.getElementById(s).classList.toggle('hidden', s!==id); }); }
+function err(id,msg){ var e=document.getElementById(id); if(msg){ e.textContent=msg; e.classList.remove('hidden'); } else e.classList.add('hidden'); }
+function escapeHtml(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+async function api(path, body){
+  var payload = Object.assign({}, body || {});
+  if(auth){ payload.staffId = auth.staffId; payload.token = auth.token; }
+  var r = await fetch(N8N_BASE + path, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) });
+  var t = await r.text();
+  var j; try { j = JSON.parse(t); } catch(e){ j = { ok:false, error:'Bad response: '+t.slice(0,120) }; }
+  if(j.error === 'auth'){ logout(); j.error = 'Session expired — please sign in again.'; }
+  return j;
+}
+
+// ---------- login (shared api-stock-login endpoint) ----------
+async function doLogin(){
+  err('loginErr','');
+  var sid = document.getElementById('staffId').value.trim();
+  var pin = document.getElementById('pin').value.trim();
+  if(!sid || !pin){ err('loginErr','Enter your Staff ID and PIN.'); return; }
+  document.getElementById('loginBtn').disabled = true;
+  show('loading');
+  var res = await api('/webhook/api-stock-login', { loginStaffId: sid, pin: pin });
+  document.getElementById('loginBtn').disabled = false;
+  if(!res.ok){ show('login'); err('loginErr', res.error || 'Wrong Staff ID or PIN.'); return; }
+  auth = { token: res.token, staffId: res.staffId, name: res.name, role: res.role, defaultVan: res.defaultVan || '' };
+  localStorage.setItem(AUTH_KEY, JSON.stringify(auth));
+  enterHoldings();
+}
+
+function logout(){ auth = null; localStorage.removeItem(AUTH_KEY); document.getElementById('whoami').textContent=''; show('login'); }
+
+function enterHoldings(){
+  document.getElementById('whoami').textContent = auth.name + ' (' + auth.staffId + ')';
+  loadHoldings();
+}
+
+// ---------- holdings ----------
+async function loadHoldings(){
+  show('holdingsview');
+  err('holdingsErr','');
+  var box = document.getElementById('holdingsBox');
+  box.innerHTML = '<div class="muted">Loading…</div>';
+  var res = await api('/webhook/api-return-holdings', {});
+  if(!res.ok){ box.innerHTML = '<div class="error">'+escapeHtml(res.error||'Could not load your holdings')+'</div>'; return; }
+  state.holdings = res.lines || [];
+  if(!state.holdings.length){ box.innerHTML = '<div class="muted">Nothing currently checked out to you or your van.</div>'; document.getElementById('returnBtn').disabled = true; return; }
+  document.getElementById('returnBtn').disabled = false;
+  box.innerHTML = '';
+  state.holdings.forEach(function(l, i){
+    var div = document.createElement('div'); div.className='line';
+    if(l.highValue){
+      div.innerHTML =
+        '<div class="line-info" style="width:100%;">' +
+        '<div class="line-name">'+escapeHtml(l.itemName||l.sku)+'<span class="badge">SERIAL</span></div>' +
+        '<div class="line-meta">'+escapeHtml(l.sku)+' · at '+escapeHtml(l.location)+' · pick which unit(s) to return</div>' +
+        '<div id="serials'+i+'"></div></div>';
+      box.appendChild(div);
+      var sbox = div.querySelector('#serials'+i);
+      (l.serials||[]).forEach(function(s, j){
+        var sd = document.createElement('div'); sd.className='serial-line';
+        sd.innerHTML = '<input type="checkbox" id="ser'+i+'_'+j+'" checked><div class="line-meta">'+escapeHtml(s.serialNumber)+'</div>';
+        sbox.appendChild(sd);
+      });
+    } else {
+      div.innerHTML =
+        '<input type="checkbox" id="chk'+i+'" checked>' +
+        '<div class="line-info"><div class="line-name">'+escapeHtml(l.itemName||l.sku)+'</div>' +
+        '<div class="line-meta">'+escapeHtml(l.sku)+' · at '+escapeHtml(l.location)+' · holding '+l.qty+'</div></div>' +
+        '<div class="qty-box"><button type="button" class="qty-step" onclick="stepQty('+i+',-1)">−</button>' +
+        '<input type="number" id="qty'+i+'" min="0" max="'+l.qty+'" value="'+l.qty+'" inputmode="numeric">' +
+        '<button type="button" class="qty-step" onclick="stepQty('+i+',1)">+</button></div>';
+      box.appendChild(div);
+    }
+  });
+}
+
+function stepQty(i, delta){
+  var inp = document.getElementById('qty'+i);
+  var max = parseInt(inp.getAttribute('max'),10)||999;
+  inp.value = Math.max(0, Math.min(max, (parseInt(inp.value,10)||0) + delta));
+}
+
+// ---------- confirm ----------
+function goConfirm(){
+  err('holdingsErr','');
+  var toReturn = [];
+  state.holdings.forEach(function(l, i){
+    if(l.highValue){
+      var serials = [];
+      (l.serials||[]).forEach(function(s, j){
+        var chk = document.getElementById('ser'+i+'_'+j);
+        if(chk && chk.checked) serials.push(s.serialNumber);
+      });
+      if(serials.length) toReturn.push({ sku:l.sku, location:l.location, qty:serials.length, itemName:l.itemName, serials:serials });
+    } else {
+      var chk = document.getElementById('chk'+i);
+      var qty = parseInt((document.getElementById('qty'+i)||{}).value,10)||0;
+      if(chk && chk.checked && qty>0) toReturn.push({ sku:l.sku, location:l.location, qty:qty, itemName:l.itemName, serials:[] });
+    }
+  });
+  if(!toReturn.length){ err('holdingsErr','Select at least one item with a quantity above zero.'); return; }
+  state.toReturn = toReturn;
+  renderConfirm();
+  show('confirmview');
+}
+
+function renderConfirm(){
+  var box = document.getElementById('confirmBox'); box.innerHTML='';
+  err('confirmErr','');
+  state.toReturn.forEach(function(l){
+    var d = document.createElement('div'); d.className='line';
+    d.innerHTML = '<div class="line-info"><div class="line-name">'+escapeHtml(l.itemName||l.sku)+'</div>' +
+      '<div class="line-meta">'+escapeHtml(l.sku)+' · qty '+l.qty+' · from '+escapeHtml(l.location)+(l.serials && l.serials.length ? ' · serials: '+l.serials.map(escapeHtml).join(', ') : '')+'</div></div>';
+    box.appendChild(d);
+  });
+}
+
+async function submitReturn(){
+  err('confirmErr','');
+  document.getElementById('submitBtn').disabled = true;
+  show('loading');
+  var res = await api('/webhook/api-return-submit', {
+    lines: state.toReturn.map(function(l){ return { sku:l.sku, qty:l.qty, location:l.location, serials:l.serials||[] }; })
+  });
+  document.getElementById('submitBtn').disabled = false;
+  if(res.ok){
+    document.getElementById('resultIcon').textContent='✅';
+    document.getElementById('resultTitle').textContent='Returned to warehouse';
+    document.getElementById('resultDetail').textContent=(res.linesProcessed||state.toReturn.length)+' line(s) moved back to the warehouse.';
+    show('resultview');
+  } else {
+    show('confirmview');
+    err('confirmErr', res.error || 'Something went wrong — check with admin before retrying.');
+  }
+}
+
+// ---------- boot ----------
+document.getElementById('pin').addEventListener('keydown', function(e){ if(e.key==='Enter') doLogin(); });
+if(auth && auth.token){ enterHoldings(); } else { show('login'); }
+</script>
+</body>
+</html>
