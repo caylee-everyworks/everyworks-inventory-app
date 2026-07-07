@@ -117,8 +117,7 @@ try { auth = JSON.parse(localStorage.getItem(AUTH_KEY) || 'null'); } catch(e){}
 
 var state = {
   items: [],       // from api: {sku, name, category, advisableQty}
-  qtyBySku: {},     // sku -> qty entered
-  seededSkus: {},   // sku -> true once its advisableQty has been prefilled (don't clobber user edits)
+  qtyBySku: {},     // sku -> qty entered (defaults to 0; advisableQty is shown as a label only)
   lines: [],        // built at continue: {sku, name, qty}
   scanner: null, cameraOn: false
 };
@@ -161,7 +160,7 @@ function enterChecklist(){
   loadItems();
 }
 
-function backToChecklist(){ state.qtyBySku = {}; state.seededSkus = {}; loadItems(); }
+function backToChecklist(){ state.qtyBySku = {}; loadItems(); }
 
 // ---------- checklist ----------
 async function loadItems(){
@@ -172,12 +171,6 @@ async function loadItems(){
   var res = await api('/webhook/api-replenish-items', { van: auth.defaultVan });
   if(!res.ok){ box.innerHTML = '<div class="error">'+escapeHtml(res.error||'Could not load items')+'</div>'; return; }
   state.items = res.items || [];
-  state.items.forEach(function(it){
-    if(!state.seededSkus[it.sku]){
-      state.qtyBySku[it.sku] = it.advisableQty || 0;
-      state.seededSkus[it.sku] = true;
-    }
-  });
   if(!state.items.length){ box.innerHTML = '<div class="muted">No Tier 3 consumable items are set up yet. Ask admin to tag items as Tier 3 in Airtable.</div>'; return; }
   renderItems();
 }
