@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Everyworks — Replenish Stock</title>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <style>
   :root { --blue:#1a73e8; --green:#188038; --red:#d93025; --grey:#5f6368; --bg:#f6f8fa; }
   * { box-sizing:border-box; margin:0; padding:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; }
@@ -42,6 +43,10 @@
   .hidden { display:none; }
   .van-banner { background:#f3e8fd; color:#6a1b9a; font-weight:600; font-size:14px; padding:10px 12px; border-radius:8px; margin-bottom:12px; }
   .logout { color:#fff; background:none; border:none; width:auto; margin:0; padding:4px 8px; font-size:12px; text-decoration:underline; cursor:pointer; }
+  .advisable { color:#8430ce; font-weight:600; }
+  #reader { width:100%; border-radius:8px; overflow:hidden; margin-top:8px; }
+  .line.flash { animation:flash 1s ease; }
+  @keyframes flash { 0%,100% { background:transparent; } 30% { background:#f3e8fd; } }
 </style>
 </head>
 <body>
@@ -69,8 +74,11 @@
   <div class="card">
     <h2>Top up consumables</h2>
     <div class="muted">Enter how much of each item you're putting back into your van. This is logged as van usage since the last top-up.</div>
+    <div id="reader" class="hidden"></div>
+    <button class="btn-secondary" id="camBtn" onclick="toggleCamera()">📷 Scan to add</button>
     <label>Filter</label>
     <input type="text" id="itemFilter" placeholder="Search items…" oninput="renderItems()">
+    <div class="error hidden" id="scanErr"></div>
     <div id="itemsBox" style="margin-top:6px;"><div class="muted">Loading…</div></div>
   </div>
   <button class="btn-primary" onclick="continueReplenish()">Continue</button>
@@ -108,9 +116,11 @@ var auth = null;
 try { auth = JSON.parse(localStorage.getItem(AUTH_KEY) || 'null'); } catch(e){}
 
 var state = {
-  items: [],       // from api: {sku, name, category}
+  items: [],       // from api: {sku, name, category, advisableQty}
   qtyBySku: {},     // sku -> qty entered
-  lines: []         // built at continue: {sku, name, qty}
+  seededSkus: {},   // sku -> true once its advisableQty has been prefilled (don't clobber user edits)
+  lines: [],        // built at continue: {sku, name, qty}
+  scanner: null, cameraOn: false
 };
 
 function show(id){ ['login','checklist','confirmview','resultview','loading'].forEach(function(s){ document.getElementById(s).classList.toggle('hidden', s!==id); }); }
@@ -151,7 +161,7 @@ function enterChecklist(){
   loadItems();
 }
 
-function backToChecklist(){ state.qtyBySku = {}; loadItems(); }
+function backToChecklist(){ state.qtyBySku = {}; state.seededSkus = {}; loadItems(); }
 
 // ---------- checklist ----------
 async function loadItems(){
@@ -159,9 +169,15 @@ async function loadItems(){
   err('checklistErr','');
   var box = document.getElementById('itemsBox');
   box.innerHTML = '<div class="muted">Loading…</div>';
-  var res = await api('/webhook/api-replenish-items', {});
+  var res = await api('/webhook/api-replenish-items', { van: auth.defaultVan });
   if(!res.ok){ box.innerHTML = '<div class="error">'+escapeHtml(res.error||'Could not load items')+'</div>'; return; }
   state.items = res.items || [];
+  state.items.forEach(function(it){
+    if(!state.seededSkus[it.sku]){
+      state.qtyBySku[it.sku] = it.advisableQty || 0;
+      state.seededSkus[it.sku] = true;
+    }
+  });
   if(!state.items.length){ box.innerHTML = '<div class="muted">No Tier 3 consumable items are set up yet. Ask admin to tag items as Tier 3 in Airtable.</div>'; return; }
   renderItems();
 }
@@ -176,10 +192,11 @@ function renderItems(){
   if(!items.length){ box.innerHTML = '<div class="muted">No items match "'+escapeHtml(filter)+'".</div>'; return; }
   items.forEach(function(it){
     var qty = state.qtyBySku[it.sku] || 0;
-    var div = document.createElement('div'); div.className='line';
+    var div = document.createElement('div'); div.className='line'; div.id='row_'+it.sku;
     div.innerHTML =
       '<div class="line-info"><div class="line-name">'+escapeHtml(it.name)+'</div>' +
-      '<div class="line-meta">'+escapeHtml(it.sku)+(it.category?' · '+escapeHtml(it.category):'')+'</div></div>' +
+      '<div class="line-meta">'+escapeHtml(it.sku)+(it.category?' · '+escapeHtml(it.category):'')+
+      (it.advisableQty ? ' · <span class="advisable">Advisable: '+it.advisableQty+'</span>' : '')+'</div></div>' +
       '<div class="qty-box"><button type="button" class="qty-step" onclick="stepQty(\''+it.sku+'\',-1)">−</button>' +
       '<input type="number" id="qty_'+it.sku+'" min="0" value="'+qty+'" inputmode="numeric" onchange="setQty(\''+it.sku+'\',this.value)">' +
       '<button type="button" class="qty-step" onclick="stepQty(\''+it.sku+'\',1)">+</button></div>';
@@ -200,8 +217,52 @@ function stepQty(sku, delta){
   if(inp) inp.value = qty;
 }
 
+// ---------- scan to add ----------
+function toggleCamera(){
+  if(state.cameraOn){ stopCamera(); return; }
+  err('scanErr','');
+  if(!window.isSecureContext){ err('scanErr','Camera needs an https:// page — use the filter/qty fields instead.'); return; }
+  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){ err('scanErr','This browser blocks the camera — try Chrome or the qty fields instead.'); return; }
+  var formats = [Html5QrcodeSupportedFormats.CODE_128, Html5QrcodeSupportedFormats.QR_CODE, Html5QrcodeSupportedFormats.EAN_13, Html5QrcodeSupportedFormats.CODE_39];
+  document.getElementById('reader').classList.remove('hidden');
+  state.scanner = new Html5Qrcode('reader', { formatsToSupport: formats });
+  state.scanner.start({ facingMode:'environment' }, { fps:10, qrbox:{ width:280, height:120 } },
+    function(text){ handleScannedSku(text); },
+    function(){}
+  ).then(function(){ state.cameraOn=true; document.getElementById('camBtn').textContent='⏹ Stop scanning'; })
+   .catch(function(e){
+     var msg = String(e);
+     if(msg.indexOf('NotAllowedError') !== -1) msg = 'Camera permission denied — allow it in browser settings.';
+     else if(msg.indexOf('SecurityError') !== -1) msg = 'Browser blocked the camera (security policy). Try Chrome.';
+     else msg = 'Camera failed: '+msg;
+     err('scanErr', msg+' You can still use the qty fields below.');
+     document.getElementById('reader').classList.add('hidden');
+   });
+}
+function stopCamera(){
+  if(state.scanner && state.cameraOn){ state.scanner.stop().catch(function(){}); }
+  state.cameraOn=false;
+  document.getElementById('reader').classList.add('hidden');
+  var b=document.getElementById('camBtn'); if(b) b.textContent='📷 Scan to add';
+}
+function handleScannedSku(raw){
+  var sku = String(raw||'').trim().toUpperCase();
+  if(!sku) return;
+  var it = state.items.find(function(i){ return i.sku.toUpperCase() === sku; });
+  if(!it){ err('scanErr','SKU "'+escapeHtml(sku)+'" is not a Tier 3 consumable.'); return; }
+  err('scanErr','');
+  stepQty(it.sku, 1);
+  if(navigator.vibrate) navigator.vibrate(80);
+  var row = document.getElementById('row_'+it.sku);
+  if(row){
+    row.scrollIntoView({ behavior:'smooth', block:'center' });
+    row.classList.remove('flash'); void row.offsetWidth; row.classList.add('flash');
+  }
+}
+
 function continueReplenish(){
   err('checklistErr','');
+  stopCamera();
   if(!auth.defaultVan){ err('checklistErr','No van is assigned to your account — contact admin.'); return; }
   var lines = [];
   state.items.forEach(function(it){
