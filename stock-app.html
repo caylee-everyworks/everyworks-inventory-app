@@ -154,7 +154,11 @@
     <div class="progress" id="scanProgress"></div>
     <div class="line-name" id="scanItemName"></div>
     <div id="scanDoneBanner" class="hidden" style="background:#e6f4ea;color:var(--green);padding:10px 12px;border-radius:8px;font-weight:700;margin:8px 0;text-align:center;">✓ All serials scanned for this item</div>
-    <div class="muted" id="scanHint">Start the camera and scan each unit — any serial of this SKU is fine, it fills the next empty box automatically. You can also tap a box and type directly.</div>
+    <div id="scanConfirm" class="hidden" style="background:#e8f0fe;color:var(--blue);padding:12px;border-radius:8px;margin:8px 0;text-align:center;">
+      <div id="scanConfirmText" style="font-weight:700;"></div>
+      <button class="btn-primary" style="margin-top:8px;" onclick="continueScanning()">📷 Scan next serial</button>
+    </div>
+    <div class="muted" id="scanHint">Start the camera and scan each unit — any serial of this SKU is fine, you'll get a confirmation after each one. You can also tap a box and type directly.</div>
     <div id="reader"></div>
     <button class="btn-secondary" id="camBtn" onclick="toggleCamera()">📷 Start camera</button>
     <div id="serialSlots" style="margin-top:10px;"></div>
@@ -416,6 +420,7 @@ function startScanStep(){
   document.getElementById('scanProgress').textContent = 'Item '+(state.scanIdx+1)+' of '+state.scanQueue.length;
   document.getElementById('scanItemName').textContent = (item.itemName||item.sku)+' — scan '+item.qty+' serial'+(item.qty>1?'s':'');
   document.getElementById('scanNextBtn').textContent = (state.scanIdx+1 < state.scanQueue.length) ? 'Next item' : 'Continue';
+  document.getElementById('scanConfirm').classList.add('hidden');
   err('scanErr','');
   renderScanOverview();
   renderSerialSlots();
@@ -488,12 +493,19 @@ function toggleCamera(){
   if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){ err('scanErr','This browser blocks the camera — try Chrome or manual entry.'); return; }
   var formats = [Html5QrcodeSupportedFormats.CODE_128, Html5QrcodeSupportedFormats.QR_CODE, Html5QrcodeSupportedFormats.EAN_13, Html5QrcodeSupportedFormats.CODE_39];
   state.scanner = new Html5Qrcode('reader', { formatsToSupport: formats });
+  document.getElementById('scanConfirm').classList.add('hidden');
   state.scanner.start({ facingMode:'environment' }, { fps:10, qrbox:{ width:280, height:120 } },
     function(text){
+      // stop after each successful scan and show an explicit confirmation —
+      // silently continuing to scan made it hard to tell whether a scan landed
       var idx = firstEmptySlotIndex();
       if(idx===-1){ stopCamera(); return; }
       updateSerialSlot(idx, String(text).trim());
-      if(firstEmptySlotIndex()===-1) stopCamera();
+      stopCamera();
+      if(firstEmptySlotIndex()!==-1){
+        document.getElementById('scanConfirmText').textContent = '✓ Scanned: '+text;
+        document.getElementById('scanConfirm').classList.remove('hidden');
+      }
     },
     function(){}
   ).then(function(){ state.cameraOn=true; document.getElementById('camBtn').textContent='⏹ Stop camera'; })
@@ -505,6 +517,12 @@ function toggleCamera(){
      err('scanErr', msg+' Manual entry above always works.');
    });
 }
+
+function continueScanning(){
+  document.getElementById('scanConfirm').classList.add('hidden');
+  toggleCamera();
+}
+
 function stopCamera(){
   if(state.scanner && state.cameraOn){ state.scanner.stop().catch(function(){}); }
   state.cameraOn=false;
