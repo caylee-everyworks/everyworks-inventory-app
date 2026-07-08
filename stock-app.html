@@ -154,17 +154,13 @@
     <div class="progress" id="scanProgress"></div>
     <div class="line-name" id="scanItemName"></div>
     <div id="scanDoneBanner" class="hidden" style="background:#e6f4ea;color:var(--green);padding:10px 12px;border-radius:8px;font-weight:700;margin:8px 0;text-align:center;">✓ All serials scanned for this item</div>
-    <div class="muted" id="scanHint">Any serial of this SKU is fine — scan the sticker on whichever unit you grabbed.</div>
+    <div class="muted" id="scanHint">Start the camera and scan each unit — any serial of this SKU is fine, it fills the next empty box automatically. You can also tap a box and type directly.</div>
     <div id="reader"></div>
     <button class="btn-secondary" id="camBtn" onclick="toggleCamera()">📷 Start camera</button>
-    <div class="row" style="margin-top:10px;">
-      <input type="text" id="manualSerial" placeholder="Type serial number" autocomplete="off">
-      <button class="btn-secondary" style="flex:0 0 auto; width:auto; padding:8px 14px; margin:0;" onclick="addManualSerial()">Add</button>
-    </div>
-    <div id="serialChips" style="margin-top:8px;"></div>
+    <div id="serialSlots" style="margin-top:10px;"></div>
     <div class="error hidden" id="scanErr"></div>
   </div>
-  <button class="btn-primary" id="scanNextBtn" onclick="nextScanItem()" disabled>Next</button>
+  <button class="btn-primary" id="scanNextBtn" onclick="nextScanItem()">Next</button>
   <button class="btn-plain" onclick="stopCamera(); show('jobview')">Back</button>
 </div>
 
@@ -416,19 +412,20 @@ function destination(){
 function startScanStep(){
   var item = state.scanQueue[state.scanIdx];
   item.serials = item.serials || [];
+  while(item.serials.length < item.qty) item.serials.push('');
   document.getElementById('scanProgress').textContent = 'Item '+(state.scanIdx+1)+' of '+state.scanQueue.length;
   document.getElementById('scanItemName').textContent = (item.itemName||item.sku)+' — scan '+item.qty+' serial'+(item.qty>1?'s':'');
-  document.getElementById('manualSerial').value='';
+  document.getElementById('scanNextBtn').textContent = (state.scanIdx+1 < state.scanQueue.length) ? 'Next item' : 'Continue';
   err('scanErr','');
   renderScanOverview();
-  renderChips();
+  renderSerialSlots();
   show('scanview');
 }
 
 function renderScanOverview(){
   var box = document.getElementById('scanOverview'); box.innerHTML='';
   state.scanQueue.forEach(function(item, i){
-    var have = (item.serials||[]).length;
+    var have = (item.serials||[]).filter(function(s){ return !!s; }).length;
     var need = item.qty;
     var complete = have >= need;
     var row = document.createElement('div');
@@ -442,42 +439,48 @@ function renderScanOverview(){
   });
 }
 
-function renderChips(){
+function renderSerialSlots(){
   var item = state.scanQueue[state.scanIdx];
-  var box = document.getElementById('serialChips'); box.innerHTML='';
-  item.serials.forEach(function(s, i){
-    var c = document.createElement('div'); c.className='serial-chip';
-    c.innerHTML = escapeHtml(s)+' <span onclick="removeSerial('+i+')">✕</span>';
-    box.appendChild(c);
-  });
-  var done = item.serials.length >= item.qty;
-  document.getElementById('scanNextBtn').disabled = !done;
-  document.getElementById('scanNextBtn').textContent = done ? (state.scanIdx+1 < state.scanQueue.length ? '✓ Done — Next item' : '✓ Done — Continue') : ('Scan '+(item.qty-item.serials.length)+' more ('+item.serials.length+' / '+item.qty+')');
-  // once fully scanned, get the camera out of the way and show a clear completion banner
-  // so the technician isn't left guessing whether the item is actually done
-  document.getElementById('camBtn').classList.toggle('hidden', done);
-  document.getElementById('reader').classList.toggle('hidden', done);
-  document.getElementById('scanDoneBanner').classList.toggle('hidden', !done);
-  document.getElementById('scanHint').classList.toggle('hidden', done);
-  renderScanOverview();
+  var box = document.getElementById('serialSlots'); box.innerHTML='';
+  for(var i=0;i<item.qty;i++){
+    (function(i){
+      var filled = !!item.serials[i];
+      var row = document.createElement('div');
+      row.className = 'row';
+      row.style.cssText = 'margin-top:8px; align-items:center;';
+      row.innerHTML =
+        '<div style="flex:0 0 62px; font-size:13px; color:var(--grey); font-weight:600;">Serial '+(i+1)+'</div>' +
+        '<input type="text" id="serialSlot'+i+'" value="'+escapeHtml(item.serials[i]||'')+'" placeholder="Scan or type" autocomplete="off" style="'+(filled?'border-color:var(--green);background:#f3fbf5;':'')+'">';
+      box.appendChild(row);
+      var inp = row.querySelector('#serialSlot'+i);
+      inp.addEventListener('change', function(){ updateSerialSlot(i, inp.value); });
+      inp.addEventListener('keydown', function(e){ if(e.key==='Enter'){ e.preventDefault(); updateSerialSlot(i, inp.value); } });
+    })(i);
+  }
+  var allDone = item.serials.filter(function(s){ return !!s; }).length >= item.qty;
+  document.getElementById('scanDoneBanner').classList.toggle('hidden', !allDone);
 }
 
-function addSerial(raw){
+function updateSerialSlot(i, raw){
   var item = state.scanQueue[state.scanIdx];
   var s = String(raw||'').trim();
-  if(!s) return;
-  var all = [];
-  state.scanQueue.forEach(function(l){ (l.serials||[]).forEach(function(x){ all.push(x); }); });
-  if(all.indexOf(s) !== -1){ err('scanErr','Serial "'+s+'" already scanned.'); return; }
-  if(item.serials.length >= item.qty){ err('scanErr','Already have '+item.qty+' serial(s) for this item.'); return; }
+  if(s){
+    var dup = false;
+    state.scanQueue.forEach(function(l, li){ (l.serials||[]).forEach(function(x, xi){ if(x && x===s && !(li===state.scanIdx && xi===i)) dup=true; }); });
+    if(dup){ err('scanErr','Serial "'+s+'" is already scanned elsewhere.'); renderSerialSlots(); return; }
+  }
   err('scanErr','');
-  item.serials.push(s);
-  if(navigator.vibrate) navigator.vibrate(80);
-  if(state.cameraOn) stopCamera();
-  renderChips();
+  item.serials[i] = s;
+  if(s && navigator.vibrate) navigator.vibrate(80);
+  renderScanOverview();
+  renderSerialSlots();
 }
-function removeSerial(i){ state.scanQueue[state.scanIdx].serials.splice(i,1); document.getElementById('manualSerial').value=''; renderChips(); }
-function addManualSerial(){ addSerial(document.getElementById('manualSerial').value); document.getElementById('manualSerial').value=''; }
+
+function firstEmptySlotIndex(){
+  var item = state.scanQueue[state.scanIdx];
+  for(var i=0;i<item.qty;i++) if(!item.serials[i]) return i;
+  return -1;
+}
 
 function toggleCamera(){
   if(state.cameraOn){ stopCamera(); return; }
@@ -486,7 +489,12 @@ function toggleCamera(){
   var formats = [Html5QrcodeSupportedFormats.CODE_128, Html5QrcodeSupportedFormats.QR_CODE, Html5QrcodeSupportedFormats.EAN_13, Html5QrcodeSupportedFormats.CODE_39];
   state.scanner = new Html5Qrcode('reader', { formatsToSupport: formats });
   state.scanner.start({ facingMode:'environment' }, { fps:10, qrbox:{ width:280, height:120 } },
-    function(text){ document.getElementById('manualSerial').value = text; addSerial(text); },
+    function(text){
+      var idx = firstEmptySlotIndex();
+      if(idx===-1){ stopCamera(); return; }
+      updateSerialSlot(idx, String(text).trim());
+      if(firstEmptySlotIndex()===-1) stopCamera();
+    },
     function(){}
   ).then(function(){ state.cameraOn=true; document.getElementById('camBtn').textContent='⏹ Stop camera'; })
    .catch(function(e){
@@ -494,7 +502,7 @@ function toggleCamera(){
      if(msg.indexOf('NotAllowedError') !== -1) msg = 'Camera permission denied — allow it in browser settings.';
      else if(msg.indexOf('SecurityError') !== -1) msg = 'Browser blocked the camera (security policy). Try Chrome.';
      else msg = 'Camera failed: '+msg;
-     err('scanErr', msg+' Manual entry below always works.');
+     err('scanErr', msg+' Manual entry above always works.');
    });
 }
 function stopCamera(){
@@ -504,6 +512,9 @@ function stopCamera(){
 }
 
 function nextScanItem(){
+  var item = state.scanQueue[state.scanIdx];
+  var filled = item.serials.filter(function(s){ return !!s; }).length;
+  if(filled < item.qty){ err('scanErr','Fill in all '+item.qty+' serial number'+(item.qty>1?'s':'')+' before continuing — '+(item.qty-filled)+' remaining.'); return; }
   stopCamera();
   if(state.scanIdx+1 < state.scanQueue.length){ state.scanIdx++; startScanStep(); }
   else { renderConfirm(); show('confirmview'); }
@@ -557,7 +568,6 @@ async function submitTake(){
 // ---------- boot ----------
 document.getElementById('pin').addEventListener('keydown', function(e){ if(e.key==='Enter') doLogin(); });
 document.getElementById('jobNumInput').addEventListener('keydown', function(e){ if(e.key==='Enter') openJobFromInput(); });
-document.getElementById('manualSerial').addEventListener('keydown', function(e){ if(e.key==='Enter'){ e.preventDefault(); addManualSerial(); } });
 if(auth && auth.token){ enterDashboard(); } else { show('login'); }
 </script>
 </body>
