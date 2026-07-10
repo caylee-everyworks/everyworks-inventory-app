@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Everyworks — Inventory Month Cutoff</title>
+<style>
+  :root { --blue:#1a73e8; --green:#188038; --red:#d93025; --grey:#5f6368; --bg:#f6f8fa; }
+  * { box-sizing:border-box; margin:0; padding:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; }
+  body { background:var(--bg); color:#202124; padding-bottom:40px; }
+  header { background:#0b5394; color:#fff; padding:14px 16px; font-size:17px; font-weight:600; position:sticky; top:0; z-index:10; }
+  .step { max-width:520px; margin:0 auto; padding:16px; }
+  .card { background:#fff; border:1px solid #dadce0; border-radius:10px; padding:16px; margin-bottom:12px; }
+  h2 { font-size:15px; color:var(--grey); margin-bottom:10px; text-transform:uppercase; letter-spacing:.4px; }
+  p { font-size:14px; line-height:1.5; margin-bottom:10px; }
+  .warn { background:#fef7e0; border:1px solid #f9d67a; border-radius:8px; padding:12px; font-size:13px; color:#7a5b00; margin-bottom:14px; }
+  .confirm-line { display:flex; align-items:flex-start; gap:10px; padding:10px 0; }
+  .confirm-line input[type=checkbox] { width:22px; height:22px; margin-top:2px; flex-shrink:0; }
+  .confirm-line label { font-size:14px; line-height:1.4; }
+  button { width:100%; padding:13px; font-size:16px; font-weight:600; border:none; border-radius:8px; cursor:pointer; margin-top:10px; }
+  .btn-primary { background:var(--red); color:#fff; }
+  .btn-plain { background:#f1f3f4; color:#202124; }
+  button:disabled { opacity:.4; cursor:default; }
+  .error { color:var(--red); font-size:14px; margin-top:8px; }
+  .muted { color:var(--grey); font-size:13px; }
+  .result-icon { font-size:52px; text-align:center; margin:18px 0 6px; }
+  .result-title { text-align:center; font-size:19px; font-weight:700; margin-bottom:6px; }
+  .result-detail { text-align:center; font-size:14px; color:var(--grey); }
+  .spinner { border:3px solid #e8eaed; border-top:3px solid var(--blue); border-radius:50%; width:28px; height:28px; animation:spin .8s linear infinite; margin:14px auto; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  .hidden { display:none; }
+</style>
+</head>
+<body>
+<header>🗓️ Inventory Month Cutoff</header>
+
+<!-- CONFIRM -->
+<div class="step" id="confirmview">
+  <div class="card">
+    <h2>What this does</h2>
+    <p>Snapshots current On Hand / location quantities into each item's Opening Balance for the next period, then archives all Movement Log, Purchase Order, Sales Order, Invoice, and Consumption history so far. Nothing is deleted — history stays queryable, just flagged as archived.</p>
+    <div class="warn">⚠️ This closes the current inventory period. It is safe to re-run (idempotent), but should only be run when you actually intend to close the period.</div>
+    <div class="confirm-line">
+      <input type="checkbox" id="armCheck" onchange="document.getElementById('runBtn').disabled = !this.checked;">
+      <label for="armCheck">I understand — run the month cutoff now.</label>
+    </div>
+  </div>
+  <button class="btn-primary" id="runBtn" onclick="runCutoff()" disabled>Run Month Cutoff</button>
+  <div class="error hidden" id="confirmErr"></div>
+</div>
+
+<!-- RESULT -->
+<div class="step hidden" id="resultview">
+  <div class="card">
+    <div class="result-icon" id="resultIcon">✅</div>
+    <div class="result-title" id="resultTitle"></div>
+    <div class="result-detail" id="resultDetail"></div>
+  </div>
+  <button class="btn-plain" onclick="reset()">Back</button>
+</div>
+
+<div class="step hidden" id="loading"><div class="card"><div class="spinner"></div><div class="muted" style="text-align:center;">Running cutoff…</div></div></div>
+
+<script>
+var N8N_BASE = 'https://n8n-jpnq.srv1784919.hstgr.cloud';
+var WEBHOOK_PATH = '/webhook/everyworks-inventory-month-cutoff';
+
+function show(id){ ['confirmview','resultview','loading'].forEach(function(s){ document.getElementById(s).classList.toggle('hidden', s!==id); }); }
+function err(id,msg){ var e=document.getElementById(id); if(msg){ e.textContent=msg; e.classList.remove('hidden'); } else e.classList.add('hidden'); }
+
+function reset(){
+  document.getElementById('armCheck').checked = false;
+  document.getElementById('runBtn').disabled = true;
+  err('confirmErr','');
+  show('confirmview');
+}
+
+async function runCutoff(){
+  err('confirmErr','');
+  document.getElementById('runBtn').disabled = true;
+  show('loading');
+  try {
+    var r = await fetch(N8N_BASE + WEBHOOK_PATH, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ source: 'webapp' })
+    });
+    if (r.ok) {
+      document.getElementById('resultIcon').textContent = '✅';
+      document.getElementById('resultTitle').textContent = 'Cutoff triggered';
+      document.getElementById('resultDetail').textContent = 'The month cutoff workflow is running. Check Airtable in a minute to confirm Opening Balance / archived status.';
+      show('resultview');
+    } else {
+      show('confirmview');
+      document.getElementById('runBtn').disabled = false;
+      err('confirmErr', 'Webhook returned an error (status ' + r.status + '). Nothing may have run — check with admin before retrying.');
+    }
+  } catch (e) {
+    show('confirmview');
+    document.getElementById('runBtn').disabled = false;
+    err('confirmErr', 'Could not reach the server. Check your connection and try again.');
+  }
+}
+
+show('confirmview');
+</script>
+</body>
+</html>
