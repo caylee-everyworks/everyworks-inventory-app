@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Everyworks — Water Heater Booking</title>
+<style>
+  :root { --blue:#1a73e8; --green:#188038; --red:#d93025; --amber:#b06000; --grey:#5f6368; --bg:#f6f8fa; }
+  * { box-sizing:border-box; margin:0; padding:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; }
+  body { background:var(--bg); color:#202124; padding-bottom:40px; }
+  header { background:#0b5394; color:#fff; padding:14px 16px; font-size:17px; font-weight:600; position:sticky; top:0; z-index:10; display:flex; justify-content:space-between; align-items:center; gap:10px; }
+  header .who { font-size:12px; font-weight:400; opacity:.85; text-align:right; }
+  header .who a { color:#fff; }
+  .tabs { display:flex; background:#fff; border-bottom:1px solid #dadce0; position:sticky; top:50px; z-index:9; }
+  .tabs button { flex:1; margin:0; border-radius:0; background:#fff; color:var(--grey); font-size:15px; padding:12px; border-bottom:3px solid transparent; }
+  .tabs button.active { color:var(--blue); border-bottom-color:var(--blue); }
+  .step { max-width:560px; margin:0 auto; padding:16px; }
+  .card { background:#fff; border:1px solid #dadce0; border-radius:10px; padding:14px; margin-bottom:12px; }
+  h2 { font-size:15px; color:var(--grey); margin-bottom:10px; text-transform:uppercase; letter-spacing:.4px; }
+  label { display:block; font-size:13px; color:var(--grey); margin:10px 0 4px; }
+  input[type=text], input[type=tel], input[type=email], input[type=password], input[type=date], select, textarea {
+    width:100%; padding:11px 12px; font-size:16px; border:1px solid #dadce0; border-radius:8px; background:#fff; color:#202124;
+  }
+  textarea { resize:vertical; min-height:64px; }
+  input:focus, select:focus, textarea:focus { outline:2px solid var(--blue); border-color:var(--blue); }
+  button { width:100%; padding:13px; font-size:16px; font-weight:600; border:none; border-radius:8px; cursor:pointer; margin-top:10px; }
+  .btn-primary { background:var(--blue); color:#fff; }
+  .btn-secondary { background:#e8f0fe; color:var(--blue); }
+  .btn-green { background:var(--green); color:#fff; }
+  .btn-plain { background:#f1f3f4; color:#202124; }
+  button:disabled { opacity:.45; cursor:default; }
+  .seg { display:flex; gap:8px; }
+  .seg label { flex:1; margin:0; border:1px solid #dadce0; border-radius:8px; padding:11px 8px; text-align:center; font-size:15px; color:#202124; cursor:pointer; background:#fff; }
+  .seg input { display:none; }
+  .seg input:checked + span { color:var(--blue); font-weight:700; }
+  .seg label:has(input:checked) { border-color:var(--blue); background:#e8f0fe; }
+  .check-row { display:flex; gap:8px; align-items:stretch; }
+  .check-row button { width:auto; margin:0; padding:0 18px; }
+  .check-row .result { flex:1; }
+  .note { font-size:14px; padding:10px 12px; border-radius:8px; margin-top:8px; }
+  .note-ok { background:#e6f4ea; color:var(--green); }
+  .note-warn { background:#fef7e0; color:var(--amber); }
+  .note-err { background:#fce8e6; color:var(--red); }
+  .error { color:var(--red); font-size:14px; margin-top:8px; }
+  .muted { color:var(--grey); font-size:13px; }
+  .remember { display:flex; align-items:center; gap:8px; margin-top:12px; font-size:15px; color:#202124; }
+  .remember input { width:20px; height:20px; }
+  .slots { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:10px; margin-top:6px; }
+  .slot { border:2px solid #dadce0; border-radius:10px; padding:12px 10px; text-align:center; background:#fff; cursor:pointer; user-select:none; }
+  .slot .t { font-size:17px; font-weight:700; }
+  .slot .who { font-size:12px; color:var(--grey); margin-top:4px; line-height:1.35; }
+  .slot.available:hover { border-color:var(--blue); }
+  .slot.selected { border-color:var(--blue); background:#1a73e8; color:#fff; }
+  .slot.selected .who { color:#e8f0fe; }
+  .slot.taken { background:#f1f3f4; color:#9aa0a6; cursor:not-allowed; border-style:dashed; }
+  .slot.taken .t { text-decoration:line-through; }
+  .legend { display:flex; gap:14px; font-size:12px; color:var(--grey); margin-top:10px; }
+  .legend span::before { content:''; display:inline-block; width:12px; height:12px; border-radius:3px; margin-right:5px; vertical-align:-1px; border:2px solid #dadce0; }
+  .legend .l-sel::before { background:#1a73e8; border-color:#1a73e8; }
+  .legend .l-taken::before { background:#f1f3f4; border-style:dashed; }
+  .recap { width:100%; border-collapse:collapse; font-size:14px; }
+  .recap td { padding:8px 0; border-bottom:1px solid #f0f0f0; vertical-align:top; }
+  .recap td:first-child { color:var(--grey); width:38%; padding-right:10px; }
+  .recap tr:last-child td { border-bottom:none; }
+  .status-box { text-align:center; padding:6px 0 2px; }
+  .status-icon { font-size:46px; margin:8px 0 4px; }
+  .status-title { font-size:19px; font-weight:700; margin-bottom:6px; }
+  .spinner { border:3px solid #e8eaed; border-top:3px solid var(--blue); border-radius:50%; width:34px; height:34px; animation:spin .8s linear infinite; margin:14px auto; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  .hidden { display:none !important; }
+  .bk { padding:12px; border:1px solid #dadce0; border-radius:10px; margin-bottom:10px; background:#fff; cursor:pointer; }
+  .bk:active { background:#e8f0fe; }
+  .bk-top { display:flex; justify-content:space-between; gap:8px; align-items:flex-start; }
+  .bk-time { font-weight:700; color:var(--blue); font-size:14px; }
+  .bk-title { font-weight:600; font-size:15px; margin-top:2px; }
+  .bk-meta { font-size:13px; color:var(--grey); margin-top:2px; }
+  .pill { font-size:11px; font-weight:700; padding:3px 8px; border-radius:10px; white-space:nowrap; }
+  .pill-Success { background:#e6f4ea; color:var(--green); }
+  .pill-Pending { background:#fef7e0; color:var(--amber); }
+  .pill-Failed { background:#fce8e6; color:var(--red); }
+  .stepper { display:flex; gap:6px; margin-bottom:12px; }
+  .stepper div { flex:1; height:4px; border-radius:2px; background:#dadce0; }
+  .stepper div.on { background:var(--blue); }
+</style>
+</head>
+<body>
+<header>
+  <div>Water Heater Booking</div>
+  <div class="who hidden" id="who"><span id="whoName"></span><br><a href="#" id="logoutLink">Log out</a></div>
+</header>
+<nav class="tabs hidden" id="tabs">
+  <button class="active" data-tab="new">New booking</button>
+  <button data-tab="mine">My bookings</button>
+</nav>
+
+<!-- Login -->
+<section class="step hidden" id="vLogin">
+  <div class="card">
+    <h2>Sales team login</h2>
+    <label for="loginId">Staff ID</label>
+    <input type="text" id="loginId" autocomplete="username" autocapitalize="characters">
+    <label for="loginPin">PIN</label>
+    <input type="password" id="loginPin" inputmode="numeric" autocomplete="current-password">
+    <label class="remember"><input type="checkbox" id="loginRemember" checked> Remember me on this device</label>
+    <button class="btn-primary" id="loginBtn">Log in</button>
+    <div class="error" id="loginErr"></div>
+  </div>
+</section>
+
+<!-- Interface 1: job details -->
+<section class="step hidden" id="v1">
+  <div class="stepper"><div class="on"></div><div></div><div></div></div>
+  <div class="card">
+    <h2>Heater</h2>
+    <label for="model">Heater model</label>
+    <select id="model"><option value="">Loading models…</option></select>
+    <div id="modelType" class="muted" style="margin-top:6px"></div>
+    <div id="ceilingWrap" class="hidden">
+      <label>Installation position</label>
+      <div class="seg">
+        <label><input type="radio" name="ceiling" value="above"><span>Above false ceiling</span></label>
+        <label><input type="radio" name="ceiling" value="below"><span>Below false ceiling</span></label>
+      </div>
+    </div>
+    <label>Stock from</label>
+    <div class="seg">
+      <label><input type="radio" name="stockFrom" value="everyworks" checked><span>Everyworks</span></label>
+      <label><input type="radio" name="stockFrom" value="707"><span>707</span></label>
+    </div>
+    <div id="stockEwWrap">
+      <label>Stock availability</label>
+      <div class="check-row">
+        <button class="btn-secondary" id="stockBtn">Check</button>
+        <div class="result muted" id="stockHint" style="align-self:center">Choose a model, then tap Check.</div>
+      </div>
+      <div id="stockNote"></div>
+    </div>
+    <div id="stock707Wrap" class="hidden">
+      <label for="deliveryDate">Expected delivery date from 707</label>
+      <input type="date" id="deliveryDate">
+      <div class="muted" style="margin-top:6px">Appointments are suggested from the day after delivery.</div>
+    </div>
+  </div>
+  <div class="card">
+    <h2>Customer</h2>
+    <label for="custName">Customer name</label>
+    <input type="text" id="custName" autocomplete="off">
+    <label for="custAddress">Full address</label>
+    <textarea id="custAddress" placeholder="Block, street, #unit, Singapore 123456"></textarea>
+    <label for="custPostcode">Postcode</label>
+    <input type="text" id="custPostcode" inputmode="numeric" maxlength="6" placeholder="6 digits">
+    <label for="custPhone">Contact number</label>
+    <input type="tel" id="custPhone" placeholder="e.g. 9123 4567">
+    <label for="custEmail">Email address</label>
+    <input type="email" id="custEmail" placeholder="name@example.com">
+  </div>
+  <button class="btn-primary" id="nextBtn" disabled>Next: choose a slot</button>
+  <div class="error" id="v1Err"></div>
+</section>
+
+<!-- Interface 2: slot selection -->
+<section class="step hidden" id="v2">
+  <div class="stepper"><div class="on"></div><div class="on"></div><div></div></div>
+  <div class="card">
+    <h2>Choose date &amp; time</h2>
+    <div class="muted" id="slotRule"></div>
+    <label for="dateSel">Date</label>
+    <select id="dateSel"></select>
+    <div id="slotGrid" class="slots"></div>
+    <div class="legend"><span>Available</span><span class="l-sel">Selected</span><span class="l-taken">Unavailable</span></div>
+    <div id="slotDetail" class="muted" style="margin-top:10px"></div>
+  </div>
+  <button class="btn-green" id="confirmBtn" disabled>Confirm booking</button>
+  <button class="btn-plain" id="backBtn">Back</button>
+  <div class="error" id="v2Err"></div>
+</section>
+
+<!-- Interface 3: booking status + recap -->
+<section class="step hidden" id="v3">
+  <div class="stepper"><div class="on"></div><div class="on"></div><div class="on"></div></div>
+  <div class="card status-box" id="statusBox"></div>
+  <div class="card"><h2>Job summary</h2><table class="recap" id="recap"></table></div>
+  <button class="btn-primary hidden" id="newBookingBtn">Make another booking</button>
+  <button class="btn-plain hidden" id="toMineBtn">View my bookings</button>
+</section>
+
+<!-- Interface 4: my bookings -->
+<section class="step hidden" id="v4">
+  <div class="muted" style="margin-bottom:10px">Your upcoming appointments and recent failed bookings.</div>
+  <div id="mineList"></div>
+  <button class="btn-plain" id="refreshMine">Refresh</button>
+</section>
+
+<!-- Booking detail (from My bookings) -->
+<section class="step hidden" id="vDetail">
+  <div class="card status-box" id="detailStatus"></div>
+  <div class="card"><h2>Job summary</h2><table class="recap" id="detailRecap"></table></div>
+  <button class="btn-plain" id="detailBack">Back to my bookings</button>
+</section>
+
+<script>
+const API = 'https://n8n-jpnq.srv1784919.hstgr.cloud/webhook/heater-sales-api';
+const AUTH_KEY = 'ew_heater_auth';
+const SUPPORT_MSG = 'Booking was not completed. Please contact the support team.';
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+// ---------- auth storage ----------
+function store(kind) { try { return kind === 'local' ? window.localStorage : window.sessionStorage; } catch (e) { return null; } }
+function loadAuth() {
+  for (const k of ['local', 'session']) {
+    try { const raw = store(k)?.getItem(AUTH_KEY); if (raw) { const a = JSON.parse(raw); if (a.token && new Date(a.expires_at) > new Date()) return a; } } catch (e) {}
+  }
+  return null;
+}
+function saveAuth(a, remember) { try { store(remember ? 'local' : 'session')?.setItem(AUTH_KEY, JSON.stringify(a)); } catch (e) {} }
+function clearAuth() { for (const k of ['local', 'session']) { try { store(k)?.removeItem(AUTH_KEY); } catch (e) {} } }
+let auth = loadAuth();
+
+async function call(action, payload = {}) {
+  const res = await fetch(API, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, token: auth?.token, ...payload }) });
+  const text = await res.text();
+  let data;
+  try { data = JSON.parse(text); } catch (e) { throw new Error('Server error (' + res.status + '). Please try again.'); }
+  if (data.error === 'auth' && action !== 'login') { logout(); throw new Error(data.message || 'Please log in again.'); }
+  return data;
+}
+
+// ---------- views ----------
+const VIEWS = ['vLogin', 'v1', 'v2', 'v3', 'v4', 'vDetail'];
+function show(id) {
+  VIEWS.forEach((v) => $(v).classList.toggle('hidden', v !== id));
+  const loggedIn = id !== 'vLogin';
+  $('tabs').classList.toggle('hidden', !loggedIn);
+  $('who').classList.toggle('hidden', !loggedIn);
+  document.querySelectorAll('.tabs button').forEach((b) => b.classList.toggle('active', (b.dataset.tab === 'mine') === (id === 'v4' || id === 'vDetail')));
+  window.scrollTo(0, 0);
+}
+function logout() { clearAuth(); auth = null; show('vLogin'); }
+$('logoutLink').addEventListener('click', (e) => { e.preventDefault(); logout(); });
+document.querySelectorAll('.tabs button').forEach((b) => b.addEventListener('click', () => {
+  if (b.dataset.tab === 'mine') openMine(); else show(state.booking && !state.bookingDone ? 'v3' : 'v1');
+}));
+
+// ---------- login ----------
+$('loginBtn').addEventListener('click', async () => {
+  $('loginErr').textContent = '';
+  const staff_id = $('loginId').value.trim(); const pin = $('loginPin').value.trim();
+  if (!staff_id || !pin) { $('loginErr').textContent = 'Enter your Staff ID and PIN.'; return; }
+  $('loginBtn').disabled = true;
+  try {
+    const remember = $('loginRemember').checked;
+    const r = await call('login', { staff_id, pin, remember });
+    if (!r.ok) { $('loginErr').textContent = r.message || 'Login failed.'; return; }
+    auth = { token: r.token, name: r.name, staff_id: r.staff_id, expires_at: r.expires_at };
+    saveAuth(auth, remember);
+    $('loginPin').value = '';
+    start();
+  } catch (e) { $('loginErr').textContent = e.message; } finally { $('loginBtn').disabled = false; }
+});
+$('loginPin').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('loginBtn').click(); });
+
+// ---------- interface 1 ----------
+const state = { models: [], services: [], stock: null, slots: null, selected: null, booking: null, bookingDone: false };
+const modelObj = () => state.models.find((m) => m.model === $('model').value) || null;
+const stockFrom = () => document.querySelector('input[name=stockFrom]:checked').value;
+const ceiling = () => document.querySelector('input[name=ceiling]:checked')?.value || '';
+function todayIso() { const d = new Date(); return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10); }
+
+async function loadOptions() {
+  const r = await call('options');
+  if (!r.ok) throw new Error(r.message);
+  state.models = r.models; state.services = r.services;
+  const groups = {};
+  for (const m of r.models) (groups[m.type || 'Other'] ||= []).push(m);
+  $('model').innerHTML = '<option value="">Select a model…</option>' + Object.keys(groups).sort().map((g) =>
+    '<optgroup label="' + esc(g) + '">' + groups[g].map((m) => '<option value="' + esc(m.model) + '">' + esc(m.model) + '</option>').join('') + '</optgroup>').join('');
+}
+function selectedService() {
+  const m = modelObj(); if (!m) return null;
+  const want = m.kind === 'instant' ? 'instant heater' : (m.kind === 'storage' && ceiling() ? (m.type + ', ' + ceiling() + ' false ceiling').toLowerCase() : null);
+  return want ? state.services.find((s) => s.job_type.toLowerCase().replace(/\s+/g, ' ') === want.replace(/\s+/g, ' ')) || null : null;
+}
+function refreshV1() {
+  const m = modelObj();
+  $('ceilingWrap').classList.toggle('hidden', !(m && m.kind === 'storage'));
+  const svc = selectedService();
+  $('modelType').textContent = m ? (m.type + (svc ? ' · ' + svc.pax + ' technician' + (svc.pax > 1 ? 's' : '') + ' · ' + Math.round(svc.duration_minutes / 6) / 10 + ' h' : '')) : '';
+  const is707 = stockFrom() === '707';
+  $('stockEwWrap').classList.toggle('hidden', is707);
+  $('stock707Wrap').classList.toggle('hidden', !is707);
+  const stockOk = is707 ? !!$('deliveryDate').value : !!(state.stock && state.stock.model === $('model').value);
+  const pc = $('custPostcode').value.trim();
+  const ok = m && svc && stockOk && $('custName').value.trim() && $('custAddress').value.trim() && /^\d{6}$/.test(pc)
+    && $('custPhone').value.replace(/\D/g, '').length >= 8 && (!$('custEmail').value.trim() || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test($('custEmail').value.trim()));
+  $('nextBtn').disabled = !ok;
+}
+$('model').addEventListener('change', () => { state.stock = null; $('stockNote').innerHTML = ''; $('stockHint').textContent = $('model').value ? 'Tap Check to see stock.' : 'Choose a model, then tap Check.'; document.querySelectorAll('input[name=ceiling]').forEach((r) => { r.checked = false; }); refreshV1(); });
+document.querySelectorAll('input[name=ceiling], input[name=stockFrom]').forEach((r) => r.addEventListener('change', refreshV1));
+['deliveryDate', 'custName', 'custPostcode', 'custPhone', 'custEmail'].forEach((id) => $(id).addEventListener('input', refreshV1));
+$('custAddress').addEventListener('input', () => {
+  const m = $('custAddress').value.match(/\b(\d{6})\b(?!.*\b\d{6}\b)/s);
+  if (m && !$('custPostcode').dataset.touched) $('custPostcode').value = m[1];
+  refreshV1();
+});
+$('custPostcode').addEventListener('input', () => { $('custPostcode').dataset.touched = '1'; });
+$('deliveryDate').min = todayIso();
+
+$('stockBtn').addEventListener('click', async () => {
+  if (!$('model').value) { $('stockHint').textContent = 'Choose a model first.'; return; }
+  $('stockBtn').disabled = true; $('stockHint').textContent = 'Checking…'; $('stockNote').innerHTML = '';
+  try {
+    const r = await call('stock', { model: $('model').value });
+    if (!r.ok) throw new Error(r.message);
+    state.stock = r;
+    $('stockHint').textContent = r.available ? 'Stock available' : 'No stock';
+    $('stockNote').innerHTML = '<div class="note ' + (r.available ? 'note-ok' : 'note-warn') + '">' + esc(r.note) + '</div>';
+  } catch (e) { $('stockHint').textContent = ''; $('stockNote').innerHTML = '<div class="note note-err">' + esc(e.message) + '</div>'; }
+  finally { $('stockBtn').disabled = false; refreshV1(); }
+});
+
+function requestBody() {
+  return { model: $('model').value, ceiling: ceiling(), stock_from: stockFrom(), delivery_date: stockFrom() === '707' ? $('deliveryDate').value : '' };
+}
+$('nextBtn').addEventListener('click', async () => {
+  $('v1Err').textContent = ''; $('nextBtn').disabled = true; $('nextBtn').textContent = 'Finding available slots…';
+  try {
+    const r = await call('slots', requestBody());
+    if (!r.ok) throw new Error(r.message);
+    state.slots = r; state.selected = null;
+    renderV2();
+    show('v2');
+  } catch (e) { $('v1Err').textContent = e.message; }
+  finally { $('nextBtn').textContent = 'Next: choose a slot'; refreshV1(); }
+});
+
+// ---------- interface 2 ----------
+function renderV2() {
+  const r = state.slots;
+  $('slotRule').textContent = r.earliest_rule + ' · ' + r.job_type + ' · ' + r.pax + ' technician' + (r.pax > 1 ? 's' : '');
+  $('v2Err').textContent = '';
+  if (!r.default_date) {
+    $('v2Err').textContent = 'No available slots found in the next 6 weeks. Please contact the support team.';
+  }
+  $('dateSel').innerHTML = r.days.map((d) => {
+    const n = d.slots.filter((s) => s.available).length;
+    const tail = d.weekend ? 'Weekend - no slots' : (n ? n + ' slot' + (n > 1 ? 's' : '') + ' free' : 'Fully booked');
+    return '<option value="' + d.date + '">' + esc(d.label) + ' — ' + tail + '</option>';
+  }).join('');
+  $('dateSel').value = r.default_date || r.days[0]?.date;
+  renderSlots();
+}
+function renderSlots() {
+  const day = state.slots.days.find((d) => d.date === $('dateSel').value);
+  state.selected = null; $('confirmBtn').disabled = true; $('slotDetail').textContent = '';
+  if (!day || day.weekend || !day.slots.length) { $('slotGrid').innerHTML = '<div class="muted">No heater installations on weekends.</div>'; return; }
+  $('slotGrid').innerHTML = day.slots.map((s, i) => '<div class="slot ' + (s.available ? 'available' : 'taken') + '" data-i="' + i + '" title="' + esc(s.reason || '') + '">'
+    + '<div class="t">' + esc(s.time_label) + '</div>'
+    + '<div class="who">' + (s.available ? esc(s.technicians.join(', ')) : 'Unavailable') + '</div></div>').join('');
+  $('slotGrid').querySelectorAll('.slot').forEach((el) => el.addEventListener('click', () => {
+    const s = day.slots[Number(el.dataset.i)];
+    if (!s.available) { $('slotDetail').textContent = 'Unavailable: ' + (s.reason || 'not bookable'); return; }
+    $('slotGrid').querySelectorAll('.slot').forEach((x) => x.classList.remove('selected'));
+    el.classList.add('selected');
+    state.selected = s;
+    $('slotDetail').textContent = 'Technicians: ' + s.technicians.join(', ') + ' · Licensed practitioner: ' + s.lp_name + ' (' + fmtTime(s.lp_attend_start) + '–' + fmtTime(s.lp_attend_end) + ')';
+    $('confirmBtn').disabled = false;
+  }));
+}
+$('dateSel').addEventListener('change', renderSlots);
+$('backBtn').addEventListener('click', () => show('v1'));
+
+// ---------- interface 3 ----------
+const fmtDate = (iso) => new Date(iso).toLocaleDateString('en-SG', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric', timeZone: 'Asia/Singapore' });
+const fmtTime = (iso) => new Date(iso).toLocaleTimeString('en-SG', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Singapore' });
+function recapRows(b) {
+  const rows = [
+    ['Booking ref', b.ref],
+    ['Kickserv job', b.job_number ? '#' + b.job_number : '—'],
+    ['Product model', b.model + (b.heater_type ? ' (' + b.heater_type + ')' : '')],
+    ['Installation', b.ceiling && b.ceiling !== 'N/A' ? b.ceiling : '—'],
+    ['Stock from', b.stock_from],
+    ['Date', b.slot_start ? fmtDate(b.slot_start) : ''],
+    ['Time', b.slot_start ? fmtTime(b.slot_start) + ' – ' + fmtTime(b.slot_end) : ''],
+    ['Manpower', b.pax ? b.pax + ' technician' + (b.pax > 1 ? 's' : '') : ''],
+    ['Technician(s)', b.technicians],
+    ['Licensed practitioner', b.lp_attend],
+    ['Customer', b.customer_name + (b.customer_phone ? ' · ' + b.customer_phone : '')],
+    ['Address', b.customer_address + (b.postcode ? ' (' + b.postcode + ')' : '')],
+  ];
+  return rows.filter((r) => r[1]).map((r) => '<tr><td>' + esc(r[0]) + '</td><td>' + esc(r[1]) + '</td></tr>').join('');
+}
+function statusHtml(b, polling) {
+  if (b.status === 'Success') {
+    return '<div class="status-icon">✅</div><div class="status-title">Booked successfully</div><div class="muted">Kickserv job #' + esc(b.job_number) + ' has been created.</div>'
+      + (b.error ? '<div class="note note-warn" style="text-align:left">' + esc(b.error) + '</div>' : '');
+  }
+  if (b.status === 'Failed') {
+    return '<div class="status-icon">⚠️</div><div class="status-title">Booking failed</div><div class="note note-err">' + esc(SUPPORT_MSG) + '<br>Reference: <b>' + esc(b.ref) + '</b></div>'
+      + (b.error ? '<div class="muted" style="margin-top:8px">' + esc(b.error) + '</div>' : '');
+  }
+  return polling
+    ? '<div class="spinner"></div><div class="status-title">Booking in progress…</div><div class="muted">Please stay on this page. Creating the job on Kickserv can take up to a minute.</div>'
+    : '<div class="status-icon">⏳</div><div class="status-title">Still processing</div><div class="note note-warn">This booking has not finished yet. Check My bookings shortly. If it does not complete, please contact the support team (ref ' + esc(b.ref) + ').</div>';
+}
+
+$('confirmBtn').addEventListener('click', async () => {
+  const s = state.selected; if (!s) return;
+  $('confirmBtn').disabled = true; $('v2Err').textContent = '';
+  const m = modelObj(); const svc = selectedService();
+  const customer = { name: $('custName').value.trim(), address: $('custAddress').value.trim(), postcode: $('custPostcode').value.trim(), phone: $('custPhone').value.trim(), email: $('custEmail').value.trim() };
+  try {
+    const r = await call('book', { ...requestBody(), slot_start: s.start, customer });
+    if (!r.ok) {
+      $('v2Err').textContent = r.message || SUPPORT_MSG;
+      if (r.error === 'slot_unavailable') { const fresh = await call('slots', requestBody()); if (fresh.ok) { const keep = $('dateSel').value; state.slots = fresh; renderV2(); if (fresh.days.some((d) => d.date === keep)) { $('dateSel').value = keep; renderSlots(); } $('v2Err').textContent = r.message; } }
+      else $('confirmBtn').disabled = false;
+      return;
+    }
+    state.bookingDone = false;
+    state.booking = {
+      id: r.booking_id, ref: r.booking_ref, status: 'Pending', model: m.model, heater_type: m.type,
+      ceiling: m.kind === 'storage' ? (ceiling() === 'above' ? 'Above false ceiling' : 'Below false ceiling') : 'N/A',
+      stock_from: stockFrom() === '707' ? '707 (delivery ' + $('deliveryDate').value + ')' : 'Everyworks',
+      slot_start: s.start, slot_end: s.end, pax: svc?.pax, technicians: s.technicians.join(', '),
+      lp_attend: s.lp_name + ' ' + fmtTime(s.lp_attend_start) + '–' + fmtTime(s.lp_attend_end),
+      customer_name: customer.name, customer_phone: customer.phone, customer_address: customer.address, postcode: customer.postcode,
+    };
+    renderV3(true);
+    show('v3');
+    pollBooking();
+  } catch (e) { $('v2Err').textContent = e.message; $('confirmBtn').disabled = false; }
+});
+function renderV3(polling) {
+  $('statusBox').innerHTML = statusHtml(state.booking, polling);
+  $('recap').innerHTML = recapRows(state.booking);
+  const done = state.booking.status !== 'Pending' || !polling;
+  $('newBookingBtn').classList.toggle('hidden', !done);
+  $('toMineBtn').classList.toggle('hidden', !done);
+}
+async function pollBooking() {
+  const started = Date.now();
+  while (Date.now() - started < 180000) {
+    await new Promise((res) => setTimeout(res, 3000));
+    try {
+      const r = await call('booking_status', { booking_id: state.booking.id });
+      if (r.ok && r.booking.status !== 'Pending') {
+        state.booking = { ...state.booking, status: r.booking.status, job_number: r.booking.job_number, error: r.booking.error };
+        state.bookingDone = true;
+        renderV3(false);
+        return;
+      }
+    } catch (e) { /* transient network error: keep polling */ }
+  }
+  state.bookingDone = true;
+  renderV3(false);
+}
+$('newBookingBtn').addEventListener('click', () => {
+  ['custName', 'custAddress', 'custPostcode', 'custPhone', 'custEmail', 'deliveryDate'].forEach((id) => { $(id).value = ''; });
+  delete $('custPostcode').dataset.touched;
+  $('model').value = ''; state.stock = null; state.booking = null; $('stockNote').innerHTML = '';
+  document.querySelectorAll('input[name=ceiling]').forEach((r) => { r.checked = false; });
+  refreshV1(); show('v1');
+});
+$('toMineBtn').addEventListener('click', () => openMine());
+
+// ---------- interface 4 ----------
+let mine = [];
+async function openMine() {
+  show('v4');
+  $('mineList').innerHTML = '<div class="spinner"></div>';
+  try {
+    const r = await call('my_bookings');
+    if (!r.ok) throw new Error(r.message);
+    mine = r.bookings;
+    if (!mine.length) { $('mineList').innerHTML = '<div class="card muted">No upcoming bookings yet.</div>'; return; }
+    $('mineList').innerHTML = mine.map((b, i) => '<div class="bk" data-i="' + i + '"><div class="bk-top"><div>'
+      + '<div class="bk-time">' + (b.slot_start ? esc(fmtDate(b.slot_start) + ' · ' + fmtTime(b.slot_start) + '–' + fmtTime(b.slot_end)) : '') + '</div>'
+      + '<div class="bk-title">' + esc(b.customer_name) + '</div>'
+      + '<div class="bk-meta">' + esc(b.model) + (b.job_number ? ' · Job #' + esc(b.job_number) : '') + '</div>'
+      + '<div class="bk-meta">' + esc(b.technicians) + '</div></div>'
+      + '<span class="pill pill-' + esc(b.status) + '">' + esc(b.status) + '</span></div></div>').join('');
+    $('mineList').querySelectorAll('.bk').forEach((el) => el.addEventListener('click', () => {
+      const b = mine[Number(el.dataset.i)];
+      $('detailStatus').innerHTML = statusHtml(b, false);
+      $('detailRecap').innerHTML = recapRows(b);
+      show('vDetail');
+    }));
+  } catch (e) { $('mineList').innerHTML = '<div class="note note-err">' + esc(e.message) + '</div>'; }
+}
+$('refreshMine').addEventListener('click', openMine);
+$('detailBack').addEventListener('click', openMine);
+
+// ---------- boot ----------
+async function start() {
+  $('whoName').textContent = auth.name;
+  show('v1');
+  try { await loadOptions(); refreshV1(); } catch (e) { $('v1Err').textContent = e.message; }
+}
+if (auth) start(); else show('vLogin');
+</script>
+</body>
+</html>
