@@ -155,6 +155,7 @@
     <input type="email" id="custEmail" placeholder="name@example.com">
   </div>
   <button class="btn-primary" id="nextBtn" disabled>Next: choose a slot</button>
+  <div class="muted" id="nextHint" style="margin-top:8px"></div>
   <div class="error" id="v1Err"></div>
 </section>
 
@@ -291,9 +292,20 @@ function refreshV1() {
   $('stock707Wrap').classList.toggle('hidden', !is707);
   const stockOk = is707 ? !!$('deliveryDate').value : !!(state.stock && state.stock.model === $('model').value);
   const pc = $('custPostcode').value.trim();
-  const ok = m && svc && stockOk && $('custName').value.trim() && $('custAddress').value.trim() && /^\d{6}$/.test(pc)
-    && $('custPhone').value.replace(/\D/g, '').length >= 8 && (!$('custEmail').value.trim() || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test($('custEmail').value.trim()));
-  $('nextBtn').disabled = !ok;
+  const email = $('custEmail').value.trim();
+  const missing = [];
+  if (!m) missing.push('heater model');
+  else if (m.kind === 'storage' && !ceiling()) missing.push('above / below false ceiling');
+  else if (!svc) missing.push('a configured service for this heater type (contact support)');
+  if (!is707 && m && !stockOk) missing.push('tap Check for stock');
+  if (is707 && !$('deliveryDate').value) missing.push('707 delivery date');
+  if (!$('custName').value.trim()) missing.push('customer name');
+  if (!$('custAddress').value.trim()) missing.push('full address');
+  if (!/^\d{6}$/.test(pc)) missing.push('6-digit postcode');
+  if ($('custPhone').value.replace(/\D/g, '').length < 8) missing.push('contact number (at least 8 digits)');
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) missing.push('a valid email address');
+  $('nextBtn').disabled = missing.length > 0;
+  $('nextHint').textContent = missing.length ? 'Still needed: ' + missing.join(', ') + '.' : '';
 }
 $('model').addEventListener('change', () => { state.stock = null; $('stockNote').innerHTML = ''; $('stockHint').textContent = $('model').value ? 'Tap Check to see stock.' : 'Choose a model, then tap Check.'; document.querySelectorAll('input[name=ceiling]').forEach((r) => { r.checked = false; }); refreshV1(); });
 document.querySelectorAll('input[name=ceiling], input[name=stockFrom]').forEach((r) => r.addEventListener('change', refreshV1));
