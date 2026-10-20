@@ -405,7 +405,7 @@ $('slotNextBtn').addEventListener('click', () => {
   $('custRecap').innerHTML = [
     ['Product model', m ? m.model : ''],
     ['Date', fmtDate(s.start)],
-    ['Time', fmtTime(s.start) + ' – ' + fmtTime(s.end) + (s.kind === 'solo' ? ' (1-man)' : '')],
+    ['Time', fmtTime(s.start) + ' – ' + fmtTime(s.end)],
     ['Technician(s)', s.technicians.join(', ')],
     ['Licensed practitioner', s.lp_name + ' ' + fmtTime(s.lp_attend_start) + '–' + fmtTime(s.lp_attend_end)],
   ].map((r) => '<tr><td>' + esc(r[0]) + '</td><td>' + esc(r[1]) + '</td></tr>').join('');
