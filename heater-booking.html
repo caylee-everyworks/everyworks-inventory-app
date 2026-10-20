@@ -34,9 +34,8 @@
   .seg input { display:none; }
   .seg input:checked + span { color:var(--blue); font-weight:700; }
   .seg label:has(input:checked) { border-color:var(--blue); background:#e8f0fe; }
-  .check-row { display:flex; gap:8px; align-items:stretch; }
-  .check-row button { width:auto; margin:0; padding:0 18px; }
-  .check-row .result { flex:1; }
+  .btn-row { display:flex; gap:8px; margin-top:10px; }
+  .btn-row button { flex:1; margin:0; }
   .note { font-size:14px; padding:10px 12px; border-radius:8px; margin-top:8px; }
   .note-ok { background:#e6f4ea; color:var(--green); }
   .note-warn { background:#fef7e0; color:var(--amber); }
@@ -109,7 +108,7 @@
 
 <!-- Interface 1: job details -->
 <section class="step hidden" id="v1">
-  <div class="stepper"><div class="on"></div><div></div><div></div></div>
+  <div class="stepper"><div class="on"></div><div></div><div></div><div></div></div>
   <div class="card">
     <h2>Heater</h2>
     <label for="model">Heater model</label>
@@ -122,25 +121,54 @@
         <label><input type="radio" name="ceiling" value="below"><span>Below false ceiling</span></label>
       </div>
     </div>
-    <label>Stock from</label>
-    <div class="seg">
-      <label><input type="radio" name="stockFrom" value="everyworks" checked><span>Everyworks</span></label>
-      <label><input type="radio" name="stockFrom" value="707"><span>707</span></label>
-    </div>
-    <div id="stockEwWrap">
-      <label>Stock availability</label>
-      <div class="check-row">
-        <button class="btn-secondary" id="stockBtn">Check</button>
-        <div class="result muted" id="stockHint" style="align-self:center">Choose a model, then tap Check.</div>
+    <div id="cabinetWrap" class="hidden">
+      <label>Inside a cabinet</label>
+      <div class="seg">
+        <label><input type="radio" name="cabinet" value="yes"><span>Yes</span></label>
+        <label><input type="radio" name="cabinet" value="no"><span>No</span></label>
       </div>
-      <div id="stockNote"></div>
     </div>
-    <div id="stock707Wrap" class="hidden">
-      <label for="deliveryDate">Expected delivery date from 707</label>
+    <label>Delivery by</label>
+    <div class="seg">
+      <label><input type="radio" name="stockFrom" value="retailer" checked><span>Retailer</span></label>
+      <label><input type="radio" name="stockFrom" value="everyworks"><span>Everyworks</span></label>
+    </div>
+    <div id="stockRetailWrap">
+      <label for="deliveryDate">Expected delivery date from retailer</label>
       <input type="date" id="deliveryDate">
       <div class="muted" style="margin-top:6px">Appointments are suggested from the day after delivery.</div>
     </div>
+    <div id="stockNote"></div>
   </div>
+  <div class="btn-row">
+    <button class="btn-secondary" id="stockBtn" disabled>Check Stock</button>
+    <button class="btn-primary" id="nextBtn" disabled>Book A Slot</button>
+  </div>
+  <div class="muted" id="nextHint" style="margin-top:8px"></div>
+  <div class="error" id="v1Err"></div>
+</section>
+
+<!-- Interface 2: slot selection -->
+<section class="step hidden" id="v2">
+  <div class="stepper"><div class="on"></div><div class="on"></div><div></div><div></div></div>
+  <div class="card">
+    <h2>Choose date &amp; time</h2>
+    <div class="muted" id="slotRule"></div>
+    <label for="dateSel">Date</label>
+    <select id="dateSel"></select>
+    <div id="slotGrid" class="slots"></div>
+    <div class="legend"><span>Available</span><span class="l-sel">Selected</span><span class="l-taken">Unavailable</span></div>
+    <div id="slotDetail" class="muted" style="margin-top:10px"></div>
+  </div>
+  <button class="btn-primary" id="slotNextBtn" disabled>Next: customer details</button>
+  <button class="btn-plain" id="backBtn">Back</button>
+  <div class="error" id="v2Err"></div>
+</section>
+
+<!-- Interface 3: customer details + confirm -->
+<section class="step hidden" id="vCust">
+  <div class="stepper"><div class="on"></div><div class="on"></div><div class="on"></div><div></div></div>
+  <div class="card"><h2>Selected slot</h2><table class="recap" id="custRecap"></table></div>
   <div class="card">
     <h2>Customer</h2>
     <label for="custName">Customer name</label>
@@ -154,31 +182,15 @@
     <label for="custEmail">Email address</label>
     <input type="email" id="custEmail" placeholder="name@example.com">
   </div>
-  <button class="btn-primary" id="nextBtn" disabled>Next: choose a slot</button>
-  <div class="muted" id="nextHint" style="margin-top:8px"></div>
-  <div class="error" id="v1Err"></div>
-</section>
-
-<!-- Interface 2: slot selection -->
-<section class="step hidden" id="v2">
-  <div class="stepper"><div class="on"></div><div class="on"></div><div></div></div>
-  <div class="card">
-    <h2>Choose date &amp; time</h2>
-    <div class="muted" id="slotRule"></div>
-    <label for="dateSel">Date</label>
-    <select id="dateSel"></select>
-    <div id="slotGrid" class="slots"></div>
-    <div class="legend"><span>Available</span><span class="l-sel">Selected</span><span class="l-taken">Unavailable</span></div>
-    <div id="slotDetail" class="muted" style="margin-top:10px"></div>
-  </div>
   <button class="btn-green" id="confirmBtn" disabled>Confirm booking</button>
-  <button class="btn-plain" id="backBtn">Back</button>
-  <div class="error" id="v2Err"></div>
+  <button class="btn-plain" id="custBackBtn">Back</button>
+  <div class="muted" id="custHint" style="margin-top:8px"></div>
+  <div class="error" id="custErr"></div>
 </section>
 
-<!-- Interface 3: booking status + recap -->
+<!-- Interface 4: booking status + recap -->
 <section class="step hidden" id="v3">
-  <div class="stepper"><div class="on"></div><div class="on"></div><div class="on"></div></div>
+  <div class="stepper"><div class="on"></div><div class="on"></div><div class="on"></div><div class="on"></div></div>
   <div class="card status-box" id="statusBox"></div>
   <div class="card"><h2>Job summary</h2><table class="recap" id="recap"></table></div>
   <button class="btn-primary hidden" id="newBookingBtn">Make another booking</button>
@@ -228,7 +240,7 @@ async function call(action, payload = {}) {
 }
 
 // ---------- views ----------
-const VIEWS = ['vLogin', 'v1', 'v2', 'v3', 'v4', 'vDetail'];
+const VIEWS = ['vLogin', 'v1', 'v2', 'vCust', 'v3', 'v4', 'vDetail'];
 function show(id) {
   VIEWS.forEach((v) => $(v).classList.toggle('hidden', v !== id));
   const loggedIn = id !== 'vLogin';
@@ -266,6 +278,7 @@ const state = { models: [], services: [], stock: null, slots: null, selected: nu
 const modelObj = () => state.models.find((m) => m.model === $('model').value) || null;
 const stockFrom = () => document.querySelector('input[name=stockFrom]:checked').value;
 const ceiling = () => document.querySelector('input[name=ceiling]:checked')?.value || '';
+const cabinet = () => document.querySelector('input[name=cabinet]:checked')?.value || '';
 function todayIso() { const d = new Date(); return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10); }
 
 async function loadOptions() {
@@ -277,65 +290,70 @@ async function loadOptions() {
   $('model').innerHTML = '<option value="">Select a model…</option>' + Object.keys(groups).sort().map((g) =>
     '<optgroup label="' + esc(g) + '">' + groups[g].map((m) => '<option value="' + esc(m.model) + '">' + esc(m.model) + '</option>').join('') + '</optgroup>').join('');
 }
+// Mirrors resolveService in _heater_sales_api.js: some types (e.g. "Storage
+// Heater < 40L, below false ceiling") are split by inside / not inside cabinet.
+const normJt = (s) => String(s ?? '').toLowerCase().replace(/\s+/g, ' ').trim();
+function cabinetApplies() {
+  const m = modelObj();
+  if (!m || m.kind !== 'storage' || !ceiling()) return false;
+  const base = normJt(m.type + ', ' + ceiling() + ' false ceiling');
+  return state.services.some((s) => normJt(s.job_type).startsWith(base + ', ') && normJt(s.job_type).includes('cabinet'));
+}
 function selectedService() {
   const m = modelObj(); if (!m) return null;
-  const want = m.kind === 'instant' ? 'instant heater' : (m.kind === 'storage' && ceiling() ? (m.type + ', ' + ceiling() + ' false ceiling').toLowerCase() : null);
-  return want ? state.services.find((s) => s.job_type.toLowerCase().replace(/\s+/g, ' ') === want.replace(/\s+/g, ' ')) || null : null;
+  let want = m.kind === 'instant' ? 'instant heater' : (m.kind === 'storage' && ceiling() ? normJt(m.type + ', ' + ceiling() + ' false ceiling') : null);
+  if (want && cabinetApplies()) {
+    if (!cabinet()) return null;
+    want += cabinet() === 'yes' ? ', inside cabinet' : ', not inside cabinet';
+  }
+  return want ? state.services.find((s) => normJt(s.job_type) === want) || null : null;
 }
 function refreshV1() {
   const m = modelObj();
   $('ceilingWrap').classList.toggle('hidden', !(m && m.kind === 'storage'));
+  const needCab = cabinetApplies();
+  $('cabinetWrap').classList.toggle('hidden', !needCab);
   const svc = selectedService();
-  $('modelType').textContent = m ? (m.type + (svc ? ' · ' + svc.pax + ' technician' + (svc.pax > 1 ? 's' : '') + ' · ' + Math.round(svc.duration_minutes / 6) / 10 + ' h' : '')) : '';
-  const is707 = stockFrom() === '707';
-  $('stockEwWrap').classList.toggle('hidden', is707);
-  $('stock707Wrap').classList.toggle('hidden', !is707);
-  const stockOk = is707 ? !!$('deliveryDate').value : !!(state.stock && state.stock.model === $('model').value);
-  const pc = $('custPostcode').value.trim();
-  const email = $('custEmail').value.trim();
+  $('modelType').textContent = m ? (m.type + (svc ? ' · ' + svc.pax + ' technician' + (svc.pax > 1 ? 's' : '') + ' + licensed practitioner · ' + Math.round(svc.duration_minutes / 6) / 10 + ' h' : '')) : '';
+  const isRetail = stockFrom() === 'retailer';
+  $('stockRetailWrap').classList.toggle('hidden', !isRetail);
+  $('stockNote').classList.toggle('hidden', isRetail);
+  $('stockBtn').disabled = isRetail || !m;
+  const stockOk = isRetail ? !!$('deliveryDate').value : !!(state.stock && state.stock.model === $('model').value);
   const missing = [];
   if (!m) missing.push('heater model');
   else if (m.kind === 'storage' && !ceiling()) missing.push('above / below false ceiling');
+  else if (needCab && !cabinet()) missing.push('inside a cabinet (yes / no)');
   else if (!svc) missing.push('a configured service for this heater type (contact support)');
-  if (!is707 && m && !stockOk) missing.push('tap Check for stock');
-  if (is707 && !$('deliveryDate').value) missing.push('707 delivery date');
-  if (!$('custName').value.trim()) missing.push('customer name');
-  if (!$('custAddress').value.trim()) missing.push('full address');
-  if (!/^\d{6}$/.test(pc)) missing.push('6-digit postcode');
-  if ($('custPhone').value.replace(/\D/g, '').length < 8) missing.push('contact number (at least 8 digits)');
-  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) missing.push('a valid email address');
+  if (!isRetail && m && !stockOk) missing.push('tap Check Stock');
+  if (isRetail && !$('deliveryDate').value) missing.push('retailer delivery date');
   $('nextBtn').disabled = missing.length > 0;
   $('nextHint').textContent = missing.length ? 'Still needed: ' + missing.join(', ') + '.' : '';
 }
-$('model').addEventListener('change', () => { state.stock = null; $('stockNote').innerHTML = ''; $('stockHint').textContent = $('model').value ? 'Tap Check to see stock.' : 'Choose a model, then tap Check.'; document.querySelectorAll('input[name=ceiling]').forEach((r) => { r.checked = false; }); refreshV1(); });
-document.querySelectorAll('input[name=ceiling], input[name=stockFrom]').forEach((r) => r.addEventListener('change', refreshV1));
-['deliveryDate', 'custName', 'custPostcode', 'custPhone', 'custEmail'].forEach((id) => $(id).addEventListener('input', refreshV1));
-$('custAddress').addEventListener('input', () => {
-  const m = $('custAddress').value.match(/\b(\d{6})\b(?!.*\b\d{6}\b)/s);
-  if (m && !$('custPostcode').dataset.touched) $('custPostcode').value = m[1];
-  refreshV1();
-});
-$('custPostcode').addEventListener('input', () => { $('custPostcode').dataset.touched = '1'; });
+const clearCabinet = () => document.querySelectorAll('input[name=cabinet]').forEach((r) => { r.checked = false; });
+$('model').addEventListener('change', () => { state.stock = null; $('stockNote').innerHTML = ''; document.querySelectorAll('input[name=ceiling]').forEach((r) => { r.checked = false; }); clearCabinet(); refreshV1(); });
+document.querySelectorAll('input[name=ceiling]').forEach((r) => r.addEventListener('change', () => { clearCabinet(); refreshV1(); }));
+document.querySelectorAll('input[name=cabinet], input[name=stockFrom]').forEach((r) => r.addEventListener('change', refreshV1));
+$('deliveryDate').addEventListener('input', refreshV1);
 $('deliveryDate').min = todayIso();
 
 $('stockBtn').addEventListener('click', async () => {
-  if (!$('model').value) { $('stockHint').textContent = 'Choose a model first.'; return; }
-  $('stockBtn').disabled = true; $('stockHint').textContent = 'Checking…'; $('stockNote').innerHTML = '';
+  if (!$('model').value) return;
+  $('stockBtn').disabled = true; $('stockBtn').textContent = 'Checking…'; $('stockNote').innerHTML = '';
   try {
     const r = await call('stock', { model: $('model').value });
     if (!r.ok) throw new Error(r.message);
     state.stock = r;
-    $('stockHint').textContent = r.available ? 'Stock available' : 'No stock';
     $('stockNote').innerHTML = '<div class="note ' + (r.available ? 'note-ok' : 'note-warn') + '">' + esc(r.note) + '</div>';
-  } catch (e) { $('stockHint').textContent = ''; $('stockNote').innerHTML = '<div class="note note-err">' + esc(e.message) + '</div>'; }
-  finally { $('stockBtn').disabled = false; refreshV1(); }
+  } catch (e) { $('stockNote').innerHTML = '<div class="note note-err">' + esc(e.message) + '</div>'; }
+  finally { $('stockBtn').textContent = 'Check Stock'; refreshV1(); }
 });
 
 function requestBody() {
-  return { model: $('model').value, ceiling: ceiling(), stock_from: stockFrom(), delivery_date: stockFrom() === '707' ? $('deliveryDate').value : '' };
+  return { model: $('model').value, ceiling: ceiling(), cabinet: cabinetApplies() ? cabinet() : '', stock_from: stockFrom(), delivery_date: stockFrom() === 'retailer' ? $('deliveryDate').value : '' };
 }
 $('nextBtn').addEventListener('click', async () => {
-  $('v1Err').textContent = ''; $('nextBtn').disabled = true; $('nextBtn').textContent = 'Finding available slots…';
+  $('v1Err').textContent = ''; $('nextBtn').disabled = true; $('nextBtn').textContent = 'Finding slots…';
   try {
     const r = await call('slots', requestBody());
     if (!r.ok) throw new Error(r.message);
@@ -343,7 +361,7 @@ $('nextBtn').addEventListener('click', async () => {
     renderV2();
     show('v2');
   } catch (e) { $('v1Err').textContent = e.message; }
-  finally { $('nextBtn').textContent = 'Next: choose a slot'; refreshV1(); }
+  finally { $('nextBtn').textContent = 'Book A Slot'; refreshV1(); }
 });
 
 // ---------- interface 2 ----------
@@ -364,7 +382,7 @@ function renderV2() {
 }
 function renderSlots() {
   const day = state.slots.days.find((d) => d.date === $('dateSel').value);
-  state.selected = null; $('confirmBtn').disabled = true; $('slotDetail').textContent = '';
+  state.selected = null; $('slotNextBtn').disabled = true; $('slotDetail').textContent = '';
   if (!day || day.weekend || !day.slots.length) { $('slotGrid').innerHTML = '<div class="muted">No heater installations on weekends.</div>'; return; }
   $('slotGrid').innerHTML = day.slots.map((s, i) => '<div class="slot ' + (s.available ? 'available' : 'taken') + '" data-i="' + i + '" title="' + esc(s.reason || '') + '">'
     + '<div class="t">' + esc(s.time_label) + '</div>'
@@ -376,11 +394,47 @@ function renderSlots() {
     el.classList.add('selected');
     state.selected = s;
     $('slotDetail').textContent = 'Technicians: ' + s.technicians.join(', ') + ' · Licensed practitioner: ' + s.lp_name + ' (' + fmtTime(s.lp_attend_start) + '–' + fmtTime(s.lp_attend_end) + ')';
-    $('confirmBtn').disabled = false;
+    $('slotNextBtn').disabled = false;
   }));
 }
 $('dateSel').addEventListener('change', renderSlots);
 $('backBtn').addEventListener('click', () => show('v1'));
+$('slotNextBtn').addEventListener('click', () => {
+  const s = state.selected; if (!s) return;
+  const m = modelObj();
+  $('custRecap').innerHTML = [
+    ['Product model', m ? m.model : ''],
+    ['Date', fmtDate(s.start)],
+    ['Time', fmtTime(s.start) + ' – ' + fmtTime(s.end) + (s.kind === 'solo' ? ' (1-man)' : '')],
+    ['Technician(s)', s.technicians.join(', ')],
+    ['Licensed practitioner', s.lp_name + ' ' + fmtTime(s.lp_attend_start) + '–' + fmtTime(s.lp_attend_end)],
+  ].map((r) => '<tr><td>' + esc(r[0]) + '</td><td>' + esc(r[1]) + '</td></tr>').join('');
+  $('custErr').textContent = '';
+  refreshCust();
+  show('vCust');
+});
+
+// ---------- interface 3: customer details ----------
+function refreshCust() {
+  const pc = $('custPostcode').value.trim();
+  const email = $('custEmail').value.trim();
+  const missing = [];
+  if (!$('custName').value.trim()) missing.push('customer name');
+  if (!$('custAddress').value.trim()) missing.push('full address');
+  if (!/^\d{6}$/.test(pc)) missing.push('6-digit postcode');
+  if ($('custPhone').value.replace(/\D/g, '').length < 8) missing.push('contact number (at least 8 digits)');
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) missing.push('a valid email address');
+  $('confirmBtn').disabled = missing.length > 0 || !state.selected;
+  $('custHint').textContent = missing.length ? 'Still needed: ' + missing.join(', ') + '.' : '';
+}
+['custName', 'custPostcode', 'custPhone', 'custEmail'].forEach((id) => $(id).addEventListener('input', refreshCust));
+$('custAddress').addEventListener('input', () => {
+  const m = $('custAddress').value.match(/\b(\d{6})\b(?!.*\b\d{6}\b)/s);
+  if (m && !$('custPostcode').dataset.touched) $('custPostcode').value = m[1];
+  refreshCust();
+});
+$('custPostcode').addEventListener('input', () => { $('custPostcode').dataset.touched = '1'; });
+$('custBackBtn').addEventListener('click', () => show('v2'));
 
 // ---------- interface 3 ----------
 const fmtDate = (iso) => new Date(iso).toLocaleDateString('en-SG', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric', timeZone: 'Asia/Singapore' });
@@ -391,7 +445,7 @@ function recapRows(b) {
     ['Kickserv job', b.job_number ? '#' + b.job_number : '—'],
     ['Product model', b.model + (b.heater_type ? ' (' + b.heater_type + ')' : '')],
     ['Installation', b.ceiling && b.ceiling !== 'N/A' ? b.ceiling : '—'],
-    ['Stock from', b.stock_from],
+    ['Delivery by', b.stock_from],
     ['Date', b.slot_start ? fmtDate(b.slot_start) : ''],
     ['Time', b.slot_start ? fmtTime(b.slot_start) + ' – ' + fmtTime(b.slot_end) : ''],
     ['Manpower', b.pax ? b.pax + ' technician' + (b.pax > 1 ? 's' : '') : ''],
@@ -418,22 +472,26 @@ function statusHtml(b, polling) {
 
 $('confirmBtn').addEventListener('click', async () => {
   const s = state.selected; if (!s) return;
-  $('confirmBtn').disabled = true; $('v2Err').textContent = '';
+  $('confirmBtn').disabled = true; $('custErr').textContent = '';
   const m = modelObj(); const svc = selectedService();
   const customer = { name: $('custName').value.trim(), address: $('custAddress').value.trim(), postcode: $('custPostcode').value.trim(), phone: $('custPhone').value.trim(), email: $('custEmail').value.trim() };
   try {
-    const r = await call('book', { ...requestBody(), slot_start: s.start, customer });
+    const r = await call('book', { ...requestBody(), slot_start: s.start, slot_no: s.slot_no, customer });
     if (!r.ok) {
-      $('v2Err').textContent = r.message || SUPPORT_MSG;
-      if (r.error === 'slot_unavailable') { const fresh = await call('slots', requestBody()); if (fresh.ok) { const keep = $('dateSel').value; state.slots = fresh; renderV2(); if (fresh.days.some((d) => d.date === keep)) { $('dateSel').value = keep; renderSlots(); } $('v2Err').textContent = r.message; } }
-      else $('confirmBtn').disabled = false;
+      if (r.error === 'slot_unavailable') {
+        const fresh = await call('slots', requestBody());
+        if (fresh.ok) { const keep = $('dateSel').value; state.slots = fresh; renderV2(); if (fresh.days.some((d) => d.date === keep)) { $('dateSel').value = keep; renderSlots(); } }
+        show('v2');
+        $('v2Err').textContent = r.message;
+      } else { $('custErr').textContent = r.message || SUPPORT_MSG; refreshCust(); }
       return;
     }
     state.bookingDone = false;
+    const cab = cabinetApplies() ? (cabinet() === 'yes' ? ', inside cabinet' : ', not inside cabinet') : '';
     state.booking = {
       id: r.booking_id, ref: r.booking_ref, status: 'Pending', model: m.model, heater_type: m.type,
-      ceiling: m.kind === 'storage' ? (ceiling() === 'above' ? 'Above false ceiling' : 'Below false ceiling') : 'N/A',
-      stock_from: stockFrom() === '707' ? '707 (delivery ' + $('deliveryDate').value + ')' : 'Everyworks',
+      ceiling: m.kind === 'storage' ? (ceiling() === 'above' ? 'Above false ceiling' : 'Below false ceiling') + cab : 'N/A',
+      stock_from: stockFrom() === 'retailer' ? 'Retailer (delivery ' + $('deliveryDate').value + ')' : 'Everyworks',
       slot_start: s.start, slot_end: s.end, pax: svc?.pax, technicians: s.technicians.join(', '),
       lp_attend: s.lp_name + ' ' + fmtTime(s.lp_attend_start) + '–' + fmtTime(s.lp_attend_end),
       customer_name: customer.name, customer_phone: customer.phone, customer_address: customer.address, postcode: customer.postcode,
@@ -441,7 +499,7 @@ $('confirmBtn').addEventListener('click', async () => {
     renderV3(true);
     show('v3');
     pollBooking();
-  } catch (e) { $('v2Err').textContent = e.message; $('confirmBtn').disabled = false; }
+  } catch (e) { $('custErr').textContent = e.message; refreshCust(); }
 });
 function renderV3(polling) {
   $('statusBox').innerHTML = statusHtml(state.booking, polling);
@@ -470,8 +528,10 @@ async function pollBooking() {
 $('newBookingBtn').addEventListener('click', () => {
   ['custName', 'custAddress', 'custPostcode', 'custPhone', 'custEmail', 'deliveryDate'].forEach((id) => { $(id).value = ''; });
   delete $('custPostcode').dataset.touched;
-  $('model').value = ''; state.stock = null; state.booking = null; $('stockNote').innerHTML = '';
+  $('model').value = ''; state.stock = null; state.booking = null; state.selected = null; $('stockNote').innerHTML = '';
   document.querySelectorAll('input[name=ceiling]').forEach((r) => { r.checked = false; });
+  clearCabinet();
+  document.querySelector('input[name=stockFrom][value=retailer]').checked = true;
   refreshV1(); show('v1');
 });
 $('toMineBtn').addEventListener('click', () => openMine());
