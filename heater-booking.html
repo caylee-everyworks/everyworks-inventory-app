@@ -128,6 +128,14 @@
         <label><input type="radio" name="cabinet" value="no"><span>No</span></label>
       </div>
     </div>
+    <div id="existingWrap" class="hidden">
+      <label>Existing heater capacity?</label>
+      <div class="seg">
+        <label><input type="radio" name="existing" value="lt40"><span>&lt;40L</span></label>
+        <label><input type="radio" name="existing" value="gt40"><span>&gt;40L</span></label>
+        <label><input type="radio" name="existing" value="unsure"><span>Not Sure</span></label>
+      </div>
+    </div>
     <label>Delivery by</label>
     <div class="seg">
       <label><input type="radio" name="stockFrom" value="retailer" checked><span>Retailer</span></label>
@@ -279,6 +287,7 @@ const modelObj = () => state.models.find((m) => m.model === $('model').value) ||
 const stockFrom = () => document.querySelector('input[name=stockFrom]:checked').value;
 const ceiling = () => document.querySelector('input[name=ceiling]:checked')?.value || '';
 const cabinet = () => document.querySelector('input[name=cabinet]:checked')?.value || '';
+const existing = () => document.querySelector('input[name=existing]:checked')?.value || '';
 function todayIso() { const d = new Date(); return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10); }
 
 async function loadOptions() {
@@ -308,13 +317,20 @@ function selectedService() {
   }
   return want ? state.services.find((s) => normJt(s.job_type) === want) || null : null;
 }
+// "Not inside cabinet" installs also ask the existing heater's capacity
+// (mirrors resolveRequest): >40L adds one staff.
+function existingApplies() { const svc = selectedService(); return !!svc && normJt(svc.job_type).endsWith(', not inside cabinet'); }
+function effectivePax() { const svc = selectedService(); return svc ? svc.pax + (existingApplies() && existing() === 'gt40' ? 1 : 0) : 0; }
 function refreshV1() {
   const m = modelObj();
   $('ceilingWrap').classList.toggle('hidden', !(m && m.kind === 'storage'));
   const needCab = cabinetApplies();
   $('cabinetWrap').classList.toggle('hidden', !needCab);
   const svc = selectedService();
-  $('modelType').textContent = m ? (m.type + (svc ? ' · ' + svc.pax + ' technician' + (svc.pax > 1 ? 's' : '') + ' + licensed practitioner · ' + Math.round(svc.duration_minutes / 6) / 10 + ' h' : '')) : '';
+  const needExisting = existingApplies();
+  $('existingWrap').classList.toggle('hidden', !needExisting);
+  const pax = effectivePax();
+  $('modelType').textContent = m ? (m.type + (svc ? ' · ' + pax + ' technician' + (pax > 1 ? 's' : '') + ' + licensed practitioner · ' + Math.round(svc.duration_minutes / 6) / 10 + ' h' : '')) : '';
   const isRetail = stockFrom() === 'retailer';
   $('stockRetailWrap').classList.toggle('hidden', !isRetail);
   $('stockNote').classList.toggle('hidden', isRetail);
@@ -325,15 +341,18 @@ function refreshV1() {
   else if (m.kind === 'storage' && !ceiling()) missing.push('above / below false ceiling');
   else if (needCab && !cabinet()) missing.push('inside a cabinet (yes / no)');
   else if (!svc) missing.push('a configured service for this heater type (contact support)');
+  else if (needExisting && !existing()) missing.push('existing heater capacity');
   if (!isRetail && m && !stockOk) missing.push('tap Check Stock');
   if (isRetail && !$('deliveryDate').value) missing.push('retailer delivery date');
   $('nextBtn').disabled = missing.length > 0;
   $('nextHint').textContent = missing.length ? 'Still needed: ' + missing.join(', ') + '.' : '';
 }
-const clearCabinet = () => document.querySelectorAll('input[name=cabinet]').forEach((r) => { r.checked = false; });
+const clearExisting = () => document.querySelectorAll('input[name=existing]').forEach((r) => { r.checked = false; });
+const clearCabinet = () => { document.querySelectorAll('input[name=cabinet]').forEach((r) => { r.checked = false; }); clearExisting(); };
 $('model').addEventListener('change', () => { state.stock = null; $('stockNote').innerHTML = ''; document.querySelectorAll('input[name=ceiling]').forEach((r) => { r.checked = false; }); clearCabinet(); refreshV1(); });
 document.querySelectorAll('input[name=ceiling]').forEach((r) => r.addEventListener('change', () => { clearCabinet(); refreshV1(); }));
-document.querySelectorAll('input[name=cabinet], input[name=stockFrom]').forEach((r) => r.addEventListener('change', refreshV1));
+document.querySelectorAll('input[name=cabinet]').forEach((r) => r.addEventListener('change', () => { clearExisting(); refreshV1(); }));
+document.querySelectorAll('input[name=existing], input[name=stockFrom]').forEach((r) => r.addEventListener('change', refreshV1));
 $('deliveryDate').addEventListener('input', refreshV1);
 $('deliveryDate').min = todayIso();
 
@@ -350,7 +369,7 @@ $('stockBtn').addEventListener('click', async () => {
 });
 
 function requestBody() {
-  return { model: $('model').value, ceiling: ceiling(), cabinet: cabinetApplies() ? cabinet() : '', stock_from: stockFrom(), delivery_date: stockFrom() === 'retailer' ? $('deliveryDate').value : '' };
+  return { model: $('model').value, ceiling: ceiling(), cabinet: cabinetApplies() ? cabinet() : '', existing_capacity: existingApplies() ? existing() : '', stock_from: stockFrom(), delivery_date: stockFrom() === 'retailer' ? $('deliveryDate').value : '' };
 }
 $('nextBtn').addEventListener('click', async () => {
   $('v1Err').textContent = ''; $('nextBtn').disabled = true; $('nextBtn').textContent = 'Finding slots…';
@@ -487,12 +506,13 @@ $('confirmBtn').addEventListener('click', async () => {
       return;
     }
     state.bookingDone = false;
-    const cab = cabinetApplies() ? (cabinet() === 'yes' ? ', inside cabinet' : ', not inside cabinet') : '';
+    const cab = (cabinetApplies() ? (cabinet() === 'yes' ? ', inside cabinet' : ', not inside cabinet') : '')
+      + (existingApplies() ? ', ' + ({ lt40: 'existing heater <40L', gt40: 'existing heater >40L', unsure: 'existing heater capacity not sure' }[existing()] ?? '') : '');
     state.booking = {
       id: r.booking_id, ref: r.booking_ref, status: 'Pending', model: m.model, heater_type: m.type,
       ceiling: m.kind === 'storage' ? (ceiling() === 'above' ? 'Above false ceiling' : 'Below false ceiling') + cab : 'N/A',
       stock_from: stockFrom() === 'retailer' ? 'Retailer (delivery ' + $('deliveryDate').value + ')' : 'Everyworks',
-      slot_start: s.start, slot_end: s.end, pax: svc?.pax, technicians: s.technicians.join(', '),
+      slot_start: s.start, slot_end: s.end, pax: effectivePax() || svc?.pax, technicians: s.technicians.join(', '),
       lp_attend: s.lp_name + ' ' + fmtTime(s.lp_attend_start) + '–' + fmtTime(s.lp_attend_end),
       customer_name: customer.name, customer_phone: customer.phone, customer_address: customer.address, postcode: customer.postcode,
     };
