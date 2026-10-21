@@ -317,9 +317,13 @@ function selectedService() {
   }
   return want ? state.services.find((s) => normJt(s.job_type) === want) || null : null;
 }
-// "Not inside cabinet" installs also ask the existing heater's capacity
-// (mirrors resolveRequest): >40L adds one staff.
-function existingApplies() { const svc = selectedService(); return !!svc && normJt(svc.job_type).endsWith(', not inside cabinet'); }
+// < 40L storage installs (above false ceiling, or below and not inside a
+// cabinet) also ask the existing heater's capacity (mirrors
+// asksExistingCapacity in the API): >40L adds one staff.
+function existingApplies() {
+  const m = modelObj(); const svc = selectedService();
+  return !!(m && svc) && m.kind === 'storage' && normJt(m.type).includes('< 40l') && !normJt(svc.job_type).endsWith(', inside cabinet');
+}
 function effectivePax() { const svc = selectedService(); return svc ? svc.pax + (existingApplies() && existing() === 'gt40' ? 1 : 0) : 0; }
 function refreshV1() {
   const m = modelObj();
