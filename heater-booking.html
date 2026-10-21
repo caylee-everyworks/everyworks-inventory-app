@@ -138,10 +138,10 @@
     </div>
     <label>Delivery by</label>
     <div class="seg">
-      <label><input type="radio" name="stockFrom" value="retailer" checked><span>Retailer</span></label>
+      <label><input type="radio" name="stockFrom" value="retailer"><span>Retailer</span></label>
       <label><input type="radio" name="stockFrom" value="everyworks"><span>Everyworks</span></label>
     </div>
-    <div id="stockRetailWrap">
+    <div id="stockRetailWrap" class="hidden">
       <label for="deliveryDate">Expected delivery date from retailer</label>
       <input type="date" id="deliveryDate">
       <div class="muted" style="margin-top:6px">Appointments are suggested from the day after delivery.</div>
@@ -284,7 +284,7 @@ $('loginPin').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('log
 // ---------- interface 1 ----------
 const state = { models: [], services: [], stock: null, slots: null, selected: null, booking: null, bookingDone: false };
 const modelObj = () => state.models.find((m) => m.model === $('model').value) || null;
-const stockFrom = () => document.querySelector('input[name=stockFrom]:checked').value;
+const stockFrom = () => document.querySelector('input[name=stockFrom]:checked')?.value || '';
 const ceiling = () => document.querySelector('input[name=ceiling]:checked')?.value || '';
 const cabinet = () => document.querySelector('input[name=cabinet]:checked')?.value || '';
 const existing = () => document.querySelector('input[name=existing]:checked')?.value || '';
@@ -337,8 +337,9 @@ function refreshV1() {
   $('modelType').textContent = m ? (m.type + (svc ? ' · ' + pax + ' technician' + (pax > 1 ? 's' : '') + ' + licensed practitioner · ' + Math.round(svc.duration_minutes / 6) / 10 + ' h' : '')) : '';
   const isRetail = stockFrom() === 'retailer';
   $('stockRetailWrap').classList.toggle('hidden', !isRetail);
-  $('stockNote').classList.toggle('hidden', isRetail);
-  $('stockBtn').disabled = isRetail || !m;
+  const isEw = stockFrom() === 'everyworks';
+  $('stockNote').classList.toggle('hidden', !isEw);
+  $('stockBtn').disabled = !isEw || !m;
   const stockOk = isRetail ? !!$('deliveryDate').value : !!(state.stock && state.stock.model === $('model').value);
   const missing = [];
   if (!m) missing.push('heater model');
@@ -346,7 +347,8 @@ function refreshV1() {
   else if (needCab && !cabinet()) missing.push('inside a cabinet (yes / no)');
   else if (!svc) missing.push('a configured service for this heater type (contact support)');
   else if (needExisting && !existing()) missing.push('existing heater capacity');
-  if (!isRetail && m && !stockOk) missing.push('tap Check Stock');
+  if (!stockFrom()) missing.push('delivery by (Retailer / Everyworks)');
+  if (isEw && m && !stockOk) missing.push('tap Check Stock');
   if (isRetail && !$('deliveryDate').value) missing.push('retailer delivery date');
   $('nextBtn').disabled = missing.length > 0;
   $('nextHint').textContent = missing.length ? 'Still needed: ' + missing.join(', ') + '.' : '';
@@ -555,7 +557,7 @@ $('newBookingBtn').addEventListener('click', () => {
   $('model').value = ''; state.stock = null; state.booking = null; state.selected = null; $('stockNote').innerHTML = '';
   document.querySelectorAll('input[name=ceiling]').forEach((r) => { r.checked = false; });
   clearCabinet();
-  document.querySelector('input[name=stockFrom][value=retailer]').checked = true;
+  document.querySelectorAll('input[name=stockFrom]').forEach((r) => { r.checked = false; });
   refreshV1(); show('v1');
 });
 $('toMineBtn').addEventListener('click', () => openMine());
