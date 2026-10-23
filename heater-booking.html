@@ -34,6 +34,7 @@
   .seg input { display:none; }
   .seg input:checked + span { color:var(--blue); font-weight:700; }
   .seg label:has(input:checked) { border-color:var(--blue); background:#e8f0fe; }
+  .seg label.off { opacity:.4; cursor:not-allowed; background:#f1f3f4; }
   .btn-row { display:flex; gap:8px; margin-top:10px; }
   .btn-row button { flex:1; margin:0; }
   .note { font-size:14px; padding:10px 12px; border-radius:8px; margin-top:8px; }
@@ -283,7 +284,7 @@ $('loginPin').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('log
 
 // ---------- interface 1 ----------
 const state = { models: [], services: [], stock: null, slots: null, selected: null, booking: null, bookingDone: false };
-const modelObj = () => state.models.find((m) => m.model === $('model').value) || null;
+const modelObj = () => state.models.find((m) => m.id === $('model').value) || null;
 const stockFrom = () => document.querySelector('input[name=stockFrom]:checked')?.value || '';
 const ceiling = () => document.querySelector('input[name=ceiling]:checked')?.value || '';
 const cabinet = () => document.querySelector('input[name=cabinet]:checked')?.value || '';
@@ -297,7 +298,7 @@ async function loadOptions() {
   const groups = {};
   for (const m of r.models) (groups[m.type || 'Other'] ||= []).push(m);
   $('model').innerHTML = '<option value="">Select a model…</option>' + Object.keys(groups).sort().map((g) =>
-    '<optgroup label="' + esc(g) + '">' + groups[g].map((m) => '<option value="' + esc(m.model) + '">' + esc(m.model) + '</option>').join('') + '</optgroup>').join('');
+    '<optgroup label="' + esc(g) + '">' + groups[g].map((m) => '<option value="' + esc(m.id) + '">' + esc(m.model) + '</option>').join('') + '</optgroup>').join('');
 }
 // Mirrors resolveService in _heater_sales_api.js: some types (e.g. "Storage
 // Heater < 40L, below false ceiling") are split by inside / not inside cabinet.
@@ -335,12 +336,21 @@ function refreshV1() {
   $('existingWrap').classList.toggle('hidden', !needExisting);
   const pax = effectivePax();
   $('modelType').textContent = m ? (m.type + (svc ? ' · ' + pax + ' technician' + (pax > 1 ? 's' : '') + ' + licensed practitioner · ' + Math.round(svc.duration_minutes / 6) / 10 + ' h' : '')) : '';
+  // Delivery by options follow the model's Airtable "Delivery By" column;
+  // nothing is clickable until a model is chosen.
+  const allowed = m ? (m.delivery_by || ['retailer', 'everyworks']) : [];
+  document.querySelectorAll('input[name=stockFrom]').forEach((r) => {
+    const ok = allowed.includes(r.value);
+    r.disabled = !ok;
+    r.closest('label').classList.toggle('off', !ok);
+    if (!ok && r.checked) r.checked = false;
+  });
   const isRetail = stockFrom() === 'retailer';
   $('stockRetailWrap').classList.toggle('hidden', !isRetail);
   const isEw = stockFrom() === 'everyworks';
   $('stockNote').classList.toggle('hidden', !isEw);
   $('stockBtn').disabled = !isEw || !m;
-  const stockOk = isRetail ? !!$('deliveryDate').value : !!(state.stock && state.stock.model === $('model').value);
+  const stockOk = isRetail ? !!$('deliveryDate').value : !!(state.stock && state.stock.model_id === $('model').value);
   const missing = [];
   if (!m) missing.push('heater model');
   else if (m.kind === 'storage' && !ceiling()) missing.push('above / below false ceiling');
@@ -366,7 +376,7 @@ $('stockBtn').addEventListener('click', async () => {
   if (!$('model').value) return;
   $('stockBtn').disabled = true; $('stockBtn').textContent = 'Checking…'; $('stockNote').innerHTML = '';
   try {
-    const r = await call('stock', { model: $('model').value });
+    const r = await call('stock', { model_id: $('model').value, model: modelObj()?.model });
     if (!r.ok) throw new Error(r.message);
     state.stock = r;
     $('stockNote').innerHTML = '<div class="note ' + (r.available ? 'note-ok' : 'note-warn') + '">' + esc(r.note) + '</div>';
@@ -375,7 +385,7 @@ $('stockBtn').addEventListener('click', async () => {
 });
 
 function requestBody() {
-  return { model: $('model').value, ceiling: ceiling(), cabinet: cabinetApplies() ? cabinet() : '', existing_capacity: existingApplies() ? existing() : '', stock_from: stockFrom(), delivery_date: stockFrom() === 'retailer' ? $('deliveryDate').value : '' };
+  return { model_id: $('model').value, model: modelObj()?.model || '', ceiling: ceiling(), cabinet: cabinetApplies() ? cabinet() : '', existing_capacity: existingApplies() ? existing() : '', stock_from: stockFrom(), delivery_date: stockFrom() === 'retailer' ? $('deliveryDate').value : '' };
 }
 $('nextBtn').addEventListener('click', async () => {
   $('v1Err').textContent = ''; $('nextBtn').disabled = true; $('nextBtn').textContent = 'Finding slots…';
