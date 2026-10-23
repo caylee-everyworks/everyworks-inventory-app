@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Everyworks — Water Heater Booking</title>
+<title>Everyworks — Water Heater Reservation</title>
 <style>
   :root { --blue:#1a73e8; --green:#188038; --red:#d93025; --amber:#b06000; --grey:#5f6368; --bg:#f6f8fa; }
   * { box-sizing:border-box; margin:0; padding:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; }
@@ -85,12 +85,12 @@
 </head>
 <body>
 <header>
-  <div>Water Heater Booking</div>
+  <div>Water Heater Reservation</div>
   <div class="who hidden" id="who"><span id="whoName"></span><br><a href="#" id="logoutLink">Log out</a></div>
 </header>
 <nav class="tabs hidden" id="tabs">
-  <button class="active" data-tab="new">New booking</button>
-  <button data-tab="mine">My bookings</button>
+  <button class="active" data-tab="new">New reservation</button>
+  <button data-tab="mine">My reservations</button>
 </nav>
 
 <!-- Login -->
@@ -151,7 +151,7 @@
   </div>
   <div class="btn-row">
     <button class="btn-secondary" id="stockBtn" disabled>Check Stock</button>
-    <button class="btn-primary" id="nextBtn" disabled>Book A Slot</button>
+    <button class="btn-primary" id="nextBtn" disabled>Reserve A Slot</button>
   </div>
   <div class="muted" id="nextHint" style="margin-top:8px"></div>
   <div class="error" id="v1Err"></div>
@@ -191,39 +191,39 @@
     <label for="custEmail">Email address</label>
     <input type="email" id="custEmail" placeholder="name@example.com">
   </div>
-  <button class="btn-green" id="confirmBtn" disabled>Confirm booking</button>
+  <button class="btn-green" id="confirmBtn" disabled>Confirm reservation</button>
   <button class="btn-plain" id="custBackBtn">Back</button>
   <div class="muted" id="custHint" style="margin-top:8px"></div>
   <div class="error" id="custErr"></div>
 </section>
 
-<!-- Interface 4: booking status + recap -->
+<!-- Interface 4: reservation status + recap -->
 <section class="step hidden" id="v3">
   <div class="stepper"><div class="on"></div><div class="on"></div><div class="on"></div><div class="on"></div></div>
   <div class="card status-box" id="statusBox"></div>
   <div class="card"><h2>Job summary</h2><table class="recap" id="recap"></table></div>
-  <button class="btn-primary hidden" id="newBookingBtn">Make another booking</button>
-  <button class="btn-plain hidden" id="toMineBtn">View my bookings</button>
+  <button class="btn-primary hidden" id="newBookingBtn">Make another reservation</button>
+  <button class="btn-plain hidden" id="toMineBtn">View my reservations</button>
 </section>
 
-<!-- Interface 4: my bookings -->
+<!-- Interface 4: my reservations -->
 <section class="step hidden" id="v4">
-  <div class="muted" style="margin-bottom:10px">Your upcoming appointments and recent failed bookings.</div>
+  <div class="muted" style="margin-bottom:10px">Your upcoming appointments and recent failed reservations.</div>
   <div id="mineList"></div>
   <button class="btn-plain" id="refreshMine">Refresh</button>
 </section>
 
-<!-- Booking detail (from My bookings) -->
+<!-- Reservation detail (from My reservations) -->
 <section class="step hidden" id="vDetail">
   <div class="card status-box" id="detailStatus"></div>
   <div class="card"><h2>Job summary</h2><table class="recap" id="detailRecap"></table></div>
-  <button class="btn-plain" id="detailBack">Back to my bookings</button>
+  <button class="btn-plain" id="detailBack">Back to my reservations</button>
 </section>
 
 <script>
 const API = 'https://n8n-jpnq.srv1784919.hstgr.cloud/webhook/heater-sales-api';
 const AUTH_KEY = 'ew_heater_auth';
-const SUPPORT_MSG = 'Booking was not completed. Please contact the support team.';
+const SUPPORT_MSG = 'Reservation was not completed. Please contact the support team.';
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
@@ -238,6 +238,9 @@ function loadAuth() {
 function saveAuth(a, remember) { try { store(remember ? 'local' : 'session')?.setItem(AUTH_KEY, JSON.stringify(a)); } catch (e) {} }
 function clearAuth() { for (const k of ['local', 'session']) { try { store(k)?.removeItem(AUTH_KEY); } catch (e) {} } }
 let auth = loadAuth();
+// Admin logins see stock counts, headcount and staff names; normal staff do
+// not (the API also strips these for staff, this only hides empty rows).
+const isAdmin = () => auth?.role === 'admin';
 
 async function call(action, payload = {}) {
   const res = await fetch(API, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, token: auth?.token, ...payload }) });
@@ -274,7 +277,7 @@ $('loginBtn').addEventListener('click', async () => {
     const remember = $('loginRemember').checked;
     const r = await call('login', { staff_id, pin, remember });
     if (!r.ok) { $('loginErr').textContent = r.message || 'Login failed.'; return; }
-    auth = { token: r.token, name: r.name, staff_id: r.staff_id, expires_at: r.expires_at };
+    auth = { token: r.token, name: r.name, staff_id: r.staff_id, role: r.role, expires_at: r.expires_at };
     saveAuth(auth, remember);
     $('loginPin').value = '';
     start();
@@ -335,7 +338,8 @@ function refreshV1() {
   const needExisting = existingApplies();
   $('existingWrap').classList.toggle('hidden', !needExisting);
   const pax = effectivePax();
-  $('modelType').textContent = m ? (m.type + (svc ? ' · ' + pax + ' technician' + (pax > 1 ? 's' : '') + ' + licensed practitioner · ' + Math.round(svc.duration_minutes / 6) / 10 + ' h' : '')) : '';
+  const hrs = svc ? Math.round(svc.duration_minutes / 6) / 10 + ' h' : '';
+  $('modelType').textContent = m ? (m.type + (svc ? ' · ' + (isAdmin() ? pax + ' technician' + (pax > 1 ? 's' : '') + ' + licensed plumber · ' : '') + hrs : '')) : '';
   // Delivery by options follow the model's Airtable "Delivery By" column;
   // nothing is clickable until a model is chosen.
   const allowed = m ? (m.delivery_by || ['retailer', 'everyworks']) : [];
@@ -396,20 +400,20 @@ $('nextBtn').addEventListener('click', async () => {
     renderV2();
     show('v2');
   } catch (e) { $('v1Err').textContent = e.message; }
-  finally { $('nextBtn').textContent = 'Book A Slot'; refreshV1(); }
+  finally { $('nextBtn').textContent = 'Reserve A Slot'; refreshV1(); }
 });
 
 // ---------- interface 2 ----------
 function renderV2() {
   const r = state.slots;
-  $('slotRule').textContent = r.earliest_rule + ' · ' + r.job_type + ' · ' + r.pax + ' technician' + (r.pax > 1 ? 's' : '');
+  $('slotRule').textContent = r.earliest_rule + ' · ' + r.job_type + (isAdmin() && r.pax ? ' · ' + r.pax + ' technician' + (r.pax > 1 ? 's' : '') : '');
   $('v2Err').textContent = '';
   if (!r.default_date) {
     $('v2Err').textContent = 'No available slots found in the next 6 weeks. Please contact the support team.';
   }
   $('dateSel').innerHTML = r.days.map((d) => {
     const n = d.slots.filter((s) => s.available).length;
-    const tail = d.weekend ? 'Weekend - no slots' : (n ? n + ' slot' + (n > 1 ? 's' : '') + ' free' : 'Fully booked');
+    const tail = d.weekend ? 'Weekend - no slots' : (n ? n + ' slot' + (n > 1 ? 's' : '') + ' free' : 'Fully reserved');
     return '<option value="' + d.date + '">' + esc(d.label) + ' — ' + tail + '</option>';
   }).join('');
   $('dateSel').value = r.default_date || r.days[0]?.date;
@@ -421,14 +425,14 @@ function renderSlots() {
   if (!day || day.weekend || !day.slots.length) { $('slotGrid').innerHTML = '<div class="muted">No heater installations on weekends.</div>'; return; }
   $('slotGrid').innerHTML = day.slots.map((s, i) => '<div class="slot ' + (s.available ? 'available' : 'taken') + '" data-i="' + i + '" title="' + esc(s.reason || '') + '">'
     + '<div class="t">' + esc(s.time_label) + '</div>'
-    + '<div class="who">' + (s.available ? esc(s.technicians.join(', ')) : 'Unavailable') + '</div></div>').join('');
+    + '<div class="who">' + (s.available ? (isAdmin() ? esc((s.technicians || []).join(', ')) : 'Available') : 'Unavailable') + '</div></div>').join('');
   $('slotGrid').querySelectorAll('.slot').forEach((el) => el.addEventListener('click', () => {
     const s = day.slots[Number(el.dataset.i)];
-    if (!s.available) { $('slotDetail').textContent = 'Unavailable: ' + (s.reason || 'not bookable'); return; }
+    if (!s.available) { $('slotDetail').textContent = 'Unavailable: ' + (s.reason || 'not available'); return; }
     $('slotGrid').querySelectorAll('.slot').forEach((x) => x.classList.remove('selected'));
     el.classList.add('selected');
     state.selected = s;
-    $('slotDetail').textContent = 'Technicians: ' + s.technicians.join(', ') + ' · Licensed practitioner: ' + s.lp_name + ' (' + fmtTime(s.lp_attend_start) + '–' + fmtTime(s.lp_attend_end) + ')';
+    $('slotDetail').textContent = isAdmin() ? 'Technicians: ' + s.technicians.join(', ') + ' · Licensed plumber: ' + s.lp_name + ' (' + fmtTime(s.lp_attend_start) + '–' + fmtTime(s.lp_attend_end) + ')' : 'Selected ' + s.time_label + '.';
     $('slotNextBtn').disabled = false;
   }));
 }
@@ -441,8 +445,10 @@ $('slotNextBtn').addEventListener('click', () => {
     ['Product model', m ? m.model : ''],
     ['Date', fmtDate(s.start)],
     ['Time', fmtTime(s.start) + ' – ' + fmtTime(s.end)],
-    ['Technician(s)', s.technicians.join(', ')],
-    ['Licensed practitioner', s.lp_name + ' ' + fmtTime(s.lp_attend_start) + '–' + fmtTime(s.lp_attend_end)],
+    ...(isAdmin() ? [
+      ['Technician(s)', s.technicians.join(', ')],
+      ['Licensed Plumber', s.lp_name + ' ' + fmtTime(s.lp_attend_start) + '–' + fmtTime(s.lp_attend_end)],
+    ] : []),
   ].map((r) => '<tr><td>' + esc(r[0]) + '</td><td>' + esc(r[1]) + '</td></tr>').join('');
   $('custErr').textContent = '';
   refreshCust();
@@ -476,16 +482,18 @@ const fmtDate = (iso) => new Date(iso).toLocaleDateString('en-SG', { weekday: 's
 const fmtTime = (iso) => new Date(iso).toLocaleTimeString('en-SG', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Singapore' });
 function recapRows(b) {
   const rows = [
-    ['Booking ref', b.ref],
-    ['Kickserv job', b.job_number ? '#' + b.job_number : '—'],
+    ['Reservation ref', b.ref],
+    ['Job Number', b.job_number ? '#' + b.job_number : '—'],
     ['Product model', b.model + (b.heater_type ? ' (' + b.heater_type + ')' : '')],
     ['Installation', b.ceiling && b.ceiling !== 'N/A' ? b.ceiling : '—'],
     ['Delivery by', b.stock_from],
     ['Date', b.slot_start ? fmtDate(b.slot_start) : ''],
     ['Time', b.slot_start ? fmtTime(b.slot_start) + ' – ' + fmtTime(b.slot_end) : ''],
-    ['Manpower', b.pax ? b.pax + ' technician' + (b.pax > 1 ? 's' : '') : ''],
-    ['Technician(s)', b.technicians],
-    ['Licensed practitioner', b.lp_attend],
+    ...(isAdmin() ? [
+      ['Manpower', b.pax ? b.pax + ' technician' + (b.pax > 1 ? 's' : '') : ''],
+      ['Technician(s)', b.technicians],
+      ['Licensed Plumber', b.lp_attend],
+    ] : []),
     ['Customer', b.customer_name + (b.customer_phone ? ' · ' + b.customer_phone : '')],
     ['Address', b.customer_address + (b.postcode ? ' (' + b.postcode + ')' : '')],
   ];
@@ -493,16 +501,16 @@ function recapRows(b) {
 }
 function statusHtml(b, polling) {
   if (b.status === 'Success') {
-    return '<div class="status-icon">✅</div><div class="status-title">Booked successfully</div><div class="muted">Kickserv job #' + esc(b.job_number) + ' has been created.</div>'
+    return '<div class="status-icon">✅</div><div class="status-title">Reserved successfully</div><div class="muted">Job number #' + esc(b.job_number) + ' has been created.</div>'
       + (b.error ? '<div class="note note-warn" style="text-align:left">' + esc(b.error) + '</div>' : '');
   }
   if (b.status === 'Failed') {
-    return '<div class="status-icon">⚠️</div><div class="status-title">Booking failed</div><div class="note note-err">' + esc(SUPPORT_MSG) + '<br>Reference: <b>' + esc(b.ref) + '</b></div>'
+    return '<div class="status-icon">⚠️</div><div class="status-title">Reservation failed</div><div class="note note-err">' + esc(SUPPORT_MSG) + '<br>Reference: <b>' + esc(b.ref) + '</b></div>'
       + (b.error ? '<div class="muted" style="margin-top:8px">' + esc(b.error) + '</div>' : '');
   }
   return polling
-    ? '<div class="spinner"></div><div class="status-title">Booking in progress…</div><div class="muted">Please stay on this page. Creating the job on Kickserv can take up to a minute.</div>'
-    : '<div class="status-icon">⏳</div><div class="status-title">Still processing</div><div class="note note-warn">This booking has not finished yet. Check My bookings shortly. If it does not complete, please contact the support team (ref ' + esc(b.ref) + ').</div>';
+    ? '<div class="spinner"></div><div class="status-title">Reservation in progress…</div><div class="muted">Please stay on this page, reservation can take up to a minute.</div>'
+    : '<div class="status-icon">⏳</div><div class="status-title">Still processing</div><div class="note note-warn">This reservation has not finished yet. Check My reservations shortly. If it does not complete, please contact the support team (ref ' + esc(b.ref) + ').</div>';
 }
 
 $('confirmBtn').addEventListener('click', async () => {
@@ -528,8 +536,8 @@ $('confirmBtn').addEventListener('click', async () => {
       id: r.booking_id, ref: r.booking_ref, status: 'Pending', model: m.model, heater_type: m.type,
       ceiling: m.kind === 'storage' ? (ceiling() === 'above' ? 'Above false ceiling' : 'Below false ceiling') + cab : 'N/A',
       stock_from: stockFrom() === 'retailer' ? 'Retailer (delivery ' + $('deliveryDate').value + ')' : 'Everyworks',
-      slot_start: s.start, slot_end: s.end, pax: effectivePax() || svc?.pax, technicians: s.technicians.join(', '),
-      lp_attend: s.lp_name + ' ' + fmtTime(s.lp_attend_start) + '–' + fmtTime(s.lp_attend_end),
+      slot_start: s.start, slot_end: s.end,
+      ...(isAdmin() ? { pax: effectivePax() || svc?.pax, technicians: s.technicians.join(', '), lp_attend: s.lp_name + ' ' + fmtTime(s.lp_attend_start) + '–' + fmtTime(s.lp_attend_end) } : {}),
       customer_name: customer.name, customer_phone: customer.phone, customer_address: customer.address, postcode: customer.postcode,
     };
     renderV3(true);
@@ -581,12 +589,12 @@ async function openMine() {
     const r = await call('my_bookings');
     if (!r.ok) throw new Error(r.message);
     mine = r.bookings;
-    if (!mine.length) { $('mineList').innerHTML = '<div class="card muted">No upcoming bookings yet.</div>'; return; }
+    if (!mine.length) { $('mineList').innerHTML = '<div class="card muted">No upcoming reservations yet.</div>'; return; }
     $('mineList').innerHTML = mine.map((b, i) => '<div class="bk" data-i="' + i + '"><div class="bk-top"><div>'
       + '<div class="bk-time">' + (b.slot_start ? esc(fmtDate(b.slot_start) + ' · ' + fmtTime(b.slot_start) + '–' + fmtTime(b.slot_end)) : '') + '</div>'
       + '<div class="bk-title">' + esc(b.customer_name) + '</div>'
       + '<div class="bk-meta">' + esc(b.model) + (b.job_number ? ' · Job #' + esc(b.job_number) : '') + '</div>'
-      + '<div class="bk-meta">' + esc(b.technicians) + '</div></div>'
+      + (isAdmin() && b.technicians ? '<div class="bk-meta">' + esc(b.technicians) + '</div>' : '') + '</div>'
       + '<span class="pill pill-' + esc(b.status) + '">' + esc(b.status) + '</span></div></div>').join('');
     $('mineList').querySelectorAll('.bk').forEach((el) => el.addEventListener('click', () => {
       const b = mine[Number(el.dataset.i)];
